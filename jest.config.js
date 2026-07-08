@@ -15,6 +15,8 @@ const customJestConfig = {
     "**/?(*.)+(spec|test).[jt]s?(x)",
   ],
   testPathIgnorePatterns: ["/node_modules/", "/.next/", "/tests/e2e/"],
+  // Include integration tests in tests/ directory
+  testRegex: "(/__tests__|/tests/(?!e2e)).*\\.(test|spec)\\.[jt]sx?$",
   collectCoverageFrom: [
     "app/**/*.{js,jsx,ts,tsx}",
     "components/**/*.{js,jsx,ts,tsx}",

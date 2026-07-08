@@ -21,18 +21,29 @@ AI coaching layer connected to GitHub — scores merged pull requests and provid
    - Add GitHub App credentials in Phase 3
    - Add Anthropic API key in Phase 4
 
-3. **Run the dev server:**
+3. **Apply Supabase migrations:**
+   ```bash
+   # Option A: Via Supabase dashboard
+   # 1. Go to https://app.supabase.com → Project → SQL Editor
+   # 2. Create a new query and paste contents of: supabase/migrations/20260708000000_baseline.sql
+   # 3. Run the query
+   
+   # Option B: Check if migrations applied
+   npx tsx scripts/check-migrations.ts
+   ```
+
+4. **Run the dev server:**
    ```bash
    npm run dev
    ```
    Open http://localhost:3000
 
-4. **Run tests:**
+5. **Run tests:**
    ```bash
    npm test
    ```
 
-5. **Lint:**
+6. **Lint:**
    ```bash
    npm run lint
    ```
@@ -79,4 +90,4 @@ Colors, typography, spacing, and components follow the Dr. Codium design system 
 
 ---
 
-**Status:** Phase 0.1 scaffold complete. Next: Phase 0.2 (Supabase setup).
+**Status:** Phase 0.2 Supabase setup complete. Next: Phase 0.3 (CI & ledger).

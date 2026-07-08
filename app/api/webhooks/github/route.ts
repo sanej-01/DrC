@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, extractPRMetadata, getPRDiff } from "@/lib/github-client";
 import { checkSkipScoring, checkLargePR, recordAlert, recordFileDisclosure } from "@/lib/guards";
+import { scanDiffForSecrets, redactSecretsFromDiff, recordSecretAlert } from "@/lib/secret-scanner";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -250,10 +251,49 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ============ PHASE 3.7 SECRET SCANNING ============
     // ============ PHASE 3.6 GUARDS ============
-    // Check for scoring limitations (async, don't block response)
+    // Check for secrets, guards, and disclosures (async, don't block response)
     (async () => {
       try {
+        let diffContent = "";
+
+        // Fetch diff for scanning (needed for secrets, large PR disclosure)
+        // Only fetch if files_changed > 0 (optimization)
+        if (prMetadata.files_changed > 0) {
+          try {
+            diffContent = await getPRDiff(
+              prMetadata.repo_owner,
+              prMetadata.repo_name,
+              prMetadata.pr_number
+            );
+          } catch (diffError) {
+            console.warn("Failed to fetch diff for scanning:", diffError);
+            // Continue anyway — lack of diff doesn't block processing
+          }
+        }
+
+        // ============ PHASE 3.7: SECRET REDACTION ============
+        // Scan diff for secrets before any processing
+        if (diffContent) {
+          const secretFindings = scanDiffForSecrets(diffContent);
+
+          if (secretFindings.length > 0) {
+            // Log security alert
+            await recordSecretAlert(
+              repo.workspace_id,
+              pr.id,
+              secretFindings,
+              prMetadata.pr_number,
+              prMetadata.author_github_handle
+            );
+
+            // Redact secrets from diff (for file-level disclosure, don't expose actual secrets)
+            diffContent = redactSecretsFromDiff(diffContent);
+          }
+        }
+
+        // ============ PHASE 3.6: GUARDS ============
         // Check if should skip scoring (empty diff, draft)
         const skipResult = await checkSkipScoring(
           pr.id,
@@ -290,26 +330,16 @@ export async function POST(request: NextRequest) {
             largeResult.details
           );
 
-          // For large PRs, try to record file-level disclosure
-          // This requires fetching diff (only if it's a large PR, to save API calls)
-          try {
-            const diff = await getPRDiff(
-              prMetadata.repo_owner,
-              prMetadata.repo_name,
-              prMetadata.pr_number
-            );
-
-            // Parse diff to extract file paths and changes
-            const files = parseDiffForFiles(diff, 200); // Only track first 200 files
+          // For large PRs, record file-level disclosure
+          if (diffContent) {
+            // Parse diff to extract file paths and changes (uses redacted diff)
+            const files = parseDiffForFiles(diffContent, 200); // Only track first 200 files
             await recordFileDisclosure(pr.id, files);
-          } catch (diffError) {
-            console.warn("Failed to parse diff for large PR:", diffError);
-            // Don't fail the whole webhook — disclosure is best-effort
           }
         }
-      } catch (guardError) {
-        console.error("Error running guards:", guardError);
-        // Don't fail the webhook — guards are best-effort
+      } catch (processingError) {
+        console.error("Error in secret scanning and guards:", processingError);
+        // Don't fail the webhook — scanning/guards are best-effort
       }
     })();
 

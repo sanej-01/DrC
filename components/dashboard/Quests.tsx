@@ -1,22 +1,31 @@
 'use client';
 
+import { useState } from 'react';
+import CoachingCardModal from './CoachingCardModal';
+
 /**
  * Quests — Phase 5.1
  * Display coaching cards as actionable quests
  * GOOD (green), IMPROVE (blue), FIX (red), SUGGEST (yellow)
+ * Phase 5.3: Clickable cards open detailed modal
  */
 
 interface CoachingCard {
   id: string;
+  pr_id?: string;
+  pr_number?: number;
   dimension: string;
   title: string;
   description: string;
   severity: 'GOOD' | 'IMPROVE' | 'FIX' | 'SUGGEST';
   file_path?: string;
+  line_number?: number;
+  created_at?: string;
 }
 
 interface QuestsProps {
   coaching_cards: CoachingCard[];
+  feedbackItems?: any[];
 }
 
 function getSeverityConfig(severity: string) {
@@ -64,7 +73,9 @@ function getSeverityConfig(severity: string) {
   }
 }
 
-export default function Quests({ coaching_cards }: QuestsProps) {
+export default function Quests({ coaching_cards, feedbackItems = [] }: QuestsProps) {
+  const [selectedCard, setSelectedCard] = useState<CoachingCard | null>(null);
+
   if (coaching_cards.length === 0) {
     return (
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 border border-green-200">
@@ -76,15 +87,17 @@ export default function Quests({ coaching_cards }: QuestsProps) {
   }
 
   return (
-    <div className="space-y-3">
-      {coaching_cards.map((card) => {
-        const config = getSeverityConfig(card.severity);
+    <>
+      <div className="space-y-3">
+        {coaching_cards.map((card) => {
+          const config = getSeverityConfig(card.severity);
 
-        return (
-          <div
-            key={card.id}
-            className={`${config.bg} ${config.border} rounded-lg p-4 transition-all hover:shadow-md`}
-          >
+          return (
+            <button
+              key={card.id}
+              onClick={() => setSelectedCard(card)}
+              className={`${config.bg} ${config.border} rounded-lg p-4 transition-all hover:shadow-md w-full text-left cursor-pointer hover:scale-[1.02]`}
+            >
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
@@ -106,15 +119,26 @@ export default function Quests({ coaching_cards }: QuestsProps) {
               </div>
             </div>
 
-            {/* Dimension badge */}
-            <div className="mt-3 pt-3 border-t border-gray-200/30">
-              <span className="inline-block px-2 py-1 bg-white/60 text-xs font-medium text-gray-600 rounded">
-                {card.dimension}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
+              {/* Dimension badge */}
+              <div className="mt-3 pt-3 border-t border-gray-200/30">
+                <span className="inline-block px-2 py-1 bg-white/60 text-xs font-medium text-gray-600 rounded">
+                  {card.dimension}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Coaching Card Modal (Phase 5.3) */}
+      {selectedCard && (
+        <CoachingCardModal
+          card={selectedCard}
+          isOpen={!!selectedCard}
+          onClose={() => setSelectedCard(null)}
+          feedbackItems={feedbackItems}
+        />
+      )}
+    </>
   );
 }

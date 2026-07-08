@@ -10,6 +10,7 @@ import { useParams, useRouter } from 'next/navigation';
 import DeveloperTrajectory from '@/components/manager/DeveloperTrajectory';
 import PRHeatMap from '@/components/manager/PRHeatMap';
 import CoachingHistory from '@/components/manager/CoachingHistory';
+import ManagerNoteEditor from '@/components/manager/ManagerNoteEditor';
 
 interface Developer {
   id: string;
@@ -66,6 +67,7 @@ export default function IndividualDeveloperPage() {
   const [stats, setStats] = useState<IndividualStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string>('');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -73,17 +75,19 @@ export default function IndividualDeveloperPage() {
         setLoading(true);
         setError(null);
 
-        const workspaceId = new URLSearchParams(
+        const wid = new URLSearchParams(
           typeof window !== 'undefined' ? window.location.search : ''
         ).get('workspace_id');
 
-        if (!workspaceId) {
+        if (!wid) {
           setError('No workspace selected');
           return;
         }
 
+        setWorkspaceId(wid);
+
         const response = await fetch(
-          `/api/manager/team/${developerId}/individual-stats?workspace_id=${workspaceId}`
+          `/api/manager/team/${developerId}/individual-stats?workspace_id=${wid}`
         );
 
         if (!response.ok) {
@@ -287,9 +291,18 @@ export default function IndividualDeveloperPage() {
       </div>
 
       {/* Coaching history */}
-      <CoachingHistory
-        cards={[]} // TODO: Fetch coaching cards from API
-        breakdown={stats.coaching.breakdown}
+      <div className="mb-8">
+        <CoachingHistory
+          cards={[]} // TODO: Fetch coaching cards from API
+          breakdown={stats.coaching.breakdown}
+        />
+      </div>
+
+      {/* Manager notes (Phase 6.3) */}
+      <ManagerNoteEditor
+        developerId={developerId}
+        workspaceId={workspaceId}
+        userRole="manager" // TODO: Get from auth context
       />
     </div>
   );

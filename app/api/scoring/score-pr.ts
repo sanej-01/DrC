@@ -10,6 +10,14 @@ import {
 } from "@/lib/retry-logic";
 import { updateAggregatesForPR } from "@/lib/aggregates";
 import { checkDailyCapAndScore, logCost, COST_PER_PR_CENTS } from "@/lib/spend-guardrail";
+import {
+  logPRScored,
+  logScoringRetry,
+  logScoringFailurePermanent,
+  logCostRecorded,
+  logCostCapReached,
+  logManagerAlertCreated,
+} from "@/lib/audit-logger";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -51,6 +59,16 @@ export async function POST(request: NextRequest) {
     // Phase 4.5: Check spend guardrail before scoring
     const capCheck = await checkDailyCapAndScore(supabase, pr.workspace_id, COST_PER_PR_CENTS);
     if (!capCheck.can_score) {
+      // Phase 4.6: Log cost cap reached
+      if (capCheck.cost_status.is_capped) {
+        await logCostCapReached(
+          supabase,
+          pr.workspace_id,
+          capCheck.cost_status.total_cost_cents,
+          capCheck.cost_status.daily_cap_cents
+        );
+      }
+
       return NextResponse.json(
         {
           error: "Daily cost cap reached",
@@ -155,6 +173,41 @@ export async function POST(request: NextRequest) {
         audit.estimated_cost_cents
       );
 
+      // Phase 4.6: Log PR scored audit entry
+      await logPRScored(
+        supabase,
+        pr.workspace_id,
+        pr_id,
+        pr.number,
+        {
+          code_quality: result.code_quality,
+          bug_risk: result.bug_risk,
+          architecture: result.architecture,
+          test_coverage: result.test_coverage,
+        },
+        {
+          triage_model: audit.triage_model,
+          scoring_model: audit.scoring_model,
+          total_tokens:
+            audit.triage_tokens_input +
+            audit.triage_tokens_output +
+            audit.scoring_tokens_input +
+            audit.scoring_tokens_output,
+          cost_cents: audit.estimated_cost_cents,
+          latency_ms: audit.total_latency_ms,
+        },
+        "api"
+      );
+
+      // Phase 4.6: Log cost recorded
+      await logCostRecorded(
+        supabase,
+        pr.workspace_id,
+        pr_id,
+        audit.estimated_cost_cents,
+        audit.scoring_model
+      );
+
       // Log to audit_log
       await supabase.from("audit_log").insert({
         workspace_id: pr.workspace_id,
@@ -230,6 +283,27 @@ export async function POST(request: NextRequest) {
           errorMessage
         );
 
+        // Phase 4.6: Log permanent failure
+        await logScoringFailurePermanent(
+          supabase,
+          pr.workspace_id,
+          pr_id,
+          pr.number,
+          currentAttempt,
+          errorType,
+          errorMessage
+        );
+
+        // Phase 4.6: Log manager alert created
+        await logManagerAlertCreated(
+          supabase,
+          pr.workspace_id,
+          pr_id,
+          pr.number,
+          "scoring_failed_permanent",
+          `Scoring failed after ${currentAttempt} attempts: ${errorType}`
+        );
+
         return NextResponse.json(
           {
             error: "Scoring failed after max attempts",
@@ -241,6 +315,17 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       } else if (failureResult.will_retry) {
+        // Phase 4.6: Log retry attempt
+        await logScoringRetry(
+          supabase,
+          pr.workspace_id,
+          pr_id,
+          pr.number,
+          currentAttempt,
+          errorType,
+          errorMessage
+        );
+
         // Will retry — return with retry info
         return NextResponse.json(
           {

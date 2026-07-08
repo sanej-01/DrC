@@ -1,9 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyWebhookSignature, extractPRMetadata } from "@/lib/github-client";
+import { verifyWebhookSignature, extractPRMetadata, getPRDiff } from "@/lib/github-client";
+import { checkSkipScoring, checkLargePR, recordAlert, recordFileDisclosure } from "@/lib/guards";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+/**
+ * Parse unified diff to extract file paths and change counts
+ * Returns files with included/omitted status (first N files included, rest omitted)
+ */
+function parseDiffForFiles(
+  diff: string,
+  scoreLimit: number
+): Array<{
+  path: string;
+  additions: number;
+  deletions: number;
+  included: boolean;
+}> {
+  const files = new Map<
+    string,
+    { additions: number; deletions: number }
+  >();
+
+  // Parse unified diff format
+  // Lines starting with "diff --git a/path/to/file b/path/to/file"
+  const lines = diff.split("\n");
+  let currentFile = "";
+
+  for (const line of lines) {
+    // File header: "diff --git a/path/to/file b/path/to/file"
+    if (line.startsWith("diff --git")) {
+      const match = line.match(/^diff --git a\/(.*) b\/(.*)/);
+      if (match) {
+        currentFile = match[1]; // Use a/ path
+        files.set(currentFile, { additions: 0, deletions: 0 });
+      }
+    }
+
+    // Count additions and deletions
+    if (currentFile) {
+      if (line.startsWith("+") && !line.startsWith("+++")) {
+        files.get(currentFile)!.additions++;
+      } else if (line.startsWith("-") && !line.startsWith("---")) {
+        files.get(currentFile)!.deletions++;
+      }
+    }
+  }
+
+  // Convert to array, mark which files are included vs omitted
+  const result: Array<{
+    path: string;
+    additions: number;
+    deletions: number;
+    included: boolean;
+  }> = [];
+
+  let fileIndex = 0;
+  for (const [path, { additions, deletions }] of files) {
+    result.push({
+      path,
+      additions,
+      deletions,
+      included: fileIndex < scoreLimit,
+    });
+    fileIndex++;
+  }
+
+  return result;
+}
 
 /**
  * POST /api/webhooks/github
@@ -183,6 +249,69 @@ export async function POST(request: NextRequest) {
         files_changed: prMetadata.files_changed,
       },
     });
+
+    // ============ PHASE 3.6 GUARDS ============
+    // Check for scoring limitations (async, don't block response)
+    (async () => {
+      try {
+        // Check if should skip scoring (empty diff, draft)
+        const skipResult = await checkSkipScoring(
+          pr.id,
+          prMetadata.files_changed,
+          false // Not draft (webhook only fires for merged)
+        );
+
+        if (skipResult.should_alert && skipResult.alert_type) {
+          await recordAlert(
+            repo.workspace_id,
+            pr.id,
+            skipResult.alert_type,
+            "warning",
+            skipResult.alert_message || "Scoring skipped",
+            skipResult.details
+          );
+        }
+
+        // Check if large PR
+        const largeResult = await checkLargePR(
+          pr.id,
+          prMetadata.files_changed,
+          prMetadata.additions,
+          prMetadata.deletions
+        );
+
+        if (largeResult.should_alert && largeResult.alert_type) {
+          await recordAlert(
+            repo.workspace_id,
+            pr.id,
+            largeResult.alert_type,
+            "warning",
+            largeResult.alert_message || "Large PR detected",
+            largeResult.details
+          );
+
+          // For large PRs, try to record file-level disclosure
+          // This requires fetching diff (only if it's a large PR, to save API calls)
+          try {
+            const diff = await getPRDiff(
+              prMetadata.repo_owner,
+              prMetadata.repo_name,
+              prMetadata.pr_number
+            );
+
+            // Parse diff to extract file paths and changes
+            const files = parseDiffForFiles(diff, 200); // Only track first 200 files
+            await recordFileDisclosure(pr.id, files);
+          } catch (diffError) {
+            console.warn("Failed to parse diff for large PR:", diffError);
+            // Don't fail the whole webhook — disclosure is best-effort
+          }
+        }
+      } catch (guardError) {
+        console.error("Error running guards:", guardError);
+        // Don't fail the webhook — guards are best-effort
+      }
+    })();
 
     // Return 200 immediately (fast response) - TC-ING-001
     return NextResponse.json(

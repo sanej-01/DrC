@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import FeedbackThumbs from './FeedbackThumbs';
 
 interface FeedbackItem {
   id: string;
@@ -270,6 +271,11 @@ export default function CoachingCardModal({
                   </>
                 )}
               </ul>
+            </section>
+
+            {/* Feedback Thumbs (Phase 5.4) */}
+            <section>
+              <FeedbackThumbs coaching_card_id={card.id} compact={true} />
             </section>
 
             {/* Metadata */}

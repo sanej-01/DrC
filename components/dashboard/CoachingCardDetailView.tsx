@@ -3,9 +3,11 @@
 /**
  * CoachingCardDetailView — Phase 5.3
  * Full-page detailed view of a coaching card with all related feedback
+ * Phase 5.4: Integrated feedback thumbs voting
  */
 
 import { useState } from 'react';
+import FeedbackThumbs from './FeedbackThumbs';
 
 interface FeedbackItem {
   id: string;
@@ -261,6 +263,11 @@ export default function CoachingCardDetailView({
             </>
           )}
         </div>
+      </section>
+
+      {/* Feedback Thumbs (Phase 5.4) */}
+      <section>
+        <FeedbackThumbs coaching_card_id={card.id} compact={false} />
       </section>
 
       {/* Metadata */}

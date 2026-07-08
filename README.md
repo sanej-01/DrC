@@ -40,7 +40,20 @@ AI coaching layer connected to GitHub — scores merged pull requests and provid
 
 5. **Run tests:**
    ```bash
+   # Unit tests (watch mode)
    npm test
+   
+   # Unit tests (CI mode with coverage)
+   npm run test:ci
+   
+   # E2E tests (Playwright)
+   npm run test:e2e
+   
+   # E2E tests (UI mode)
+   npm run test:e2e:ui
+   
+   # All tests (lint + unit + e2e)
+   npm run test:all
    ```
 
 6. **Lint:**
@@ -70,6 +83,29 @@ See `../ProjDrCodium/BUILD_LEDGER.md` for the full 43-unit plan.
 
 Deploys to Vercel (configured in Phase 9.3).
 
+## Testing & CI
+
+### Unit Tests (Jest)
+- Location: `components/__tests__/**/*.test.tsx`
+- Run: `npm test` (watch) or `npm run test:ci` (CI mode)
+- Coverage reports: `coverage/`
+
+### E2E Tests (Playwright)
+- Location: `tests/e2e/**/*.spec.ts`
+- Run: `npm run test:e2e` or `npm run test:e2e:ui`
+- Browsers: Chromium, Firefox, WebKit
+- Reports: `playwright-report/`
+
+### Linting (ESLint)
+- Run: `npm run lint`
+
+### GitHub Actions
+- Workflow: `.github/workflows/ci.yml`
+- Triggers: Push to main/develop, PRs to main/develop
+- Tests on Node 18 & 20
+- Auto-uploads coverage to Codecov
+- Preserves Playwright reports (30 days)
+
 ## Design System
 
 Colors, typography, spacing, and components follow the Dr. Codium design system (see `app/globals.css`).
@@ -90,4 +126,4 @@ Colors, typography, spacing, and components follow the Dr. Codium design system 
 
 ---
 
-**Status:** Phase 0.2 Supabase setup complete. Next: Phase 0.3 (CI & ledger).
+**Status:** Phase 0 Foundation complete. Ready for Phase 1 (Data model & security).

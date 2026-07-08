@@ -9,6 +9,7 @@ import {
   DEFAULT_RETRY_CONFIG,
 } from "@/lib/retry-logic";
 import { updateAggregatesForPR } from "@/lib/aggregates";
+import { checkDailyCapAndScore, logCost, COST_PER_PR_CENTS } from "@/lib/spend-guardrail";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -45,6 +46,19 @@ export async function POST(request: NextRequest) {
 
     if (prError || !pr) {
       return NextResponse.json({ error: "PR not found" }, { status: 404 });
+    }
+
+    // Phase 4.5: Check spend guardrail before scoring
+    const capCheck = await checkDailyCapAndScore(supabase, pr.workspace_id, COST_PER_PR_CENTS);
+    if (!capCheck.can_score) {
+      return NextResponse.json(
+        {
+          error: "Daily cost cap reached",
+          reason: capCheck.reason,
+          cost_status: capCheck.cost_status,
+        },
+        { status: 429 } // Too Many Requests (cost limit)
+      );
     }
 
     // Update queue status to "scoring"
@@ -128,6 +142,18 @@ export async function POST(request: NextRequest) {
 
       // Phase 4.4: Update aggregates for developer
       await updateAggregatesForPR(supabase, pr.workspace_id, pr_id);
+
+      // Phase 4.5: Log cost
+      await logCost(
+        supabase,
+        pr.workspace_id,
+        pr_id,
+        "score",
+        audit.scoring_model,
+        audit.scoring_tokens_input,
+        audit.scoring_tokens_output,
+        audit.estimated_cost_cents
+      );
 
       // Log to audit_log
       await supabase.from("audit_log").insert({

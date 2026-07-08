@@ -1,0 +1,21 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Dr Codium",
+  description: "AI coaching layer for GitHub pull requests",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className="h-full">
+      <body className="h-screen overflow-hidden" style={{ background: "var(--bg)", color: "var(--ink)" }}>
+        {children}
+      </body>
+    </html>
+  );
+}

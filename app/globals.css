@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  /* Layout */
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --surface-2: #fbfcfb;
+
+  /* Text colors */
+  --ink: #2b332f;
+  --ink-2: #5b6660;
+  --ink-3: #8a948e;
+
+  /* Borders */
+  --line: #e6e9e5;
+  --line-2: #d6dbd5;
+
+  /* Primary palette */
+  --sage: #6f9a87;
+  --sage-soft: #e7f0eb;
+  --sage-ink: #3a5a4c;
+  --teal: #4f8a8b;
+
+  /* Secondary palette */
+  --clay: #c08a6a;
+  --clay-soft: #f4e9e1;
+  --amber: #c79a3e;
+  --amber-soft: #f6efdc;
+  --rose: #bd7488;
+  --rose-soft: #f6e7ec;
+
+  /* Semantic */
+  --good: #5e9b7e;
+  --warn: #c79a3e;
+  --bad: #bd6f6f;
+  --mint: #2f9e76;
+  --mint-dim: #e3f2eb;
+
+  /* UI */
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(43, 51, 47, 0.04), 0 8px 24px rgba(43, 51, 47, 0.05);
+
+  /* Typography */
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "SF Mono", ui-monospace, Menlo, monospace;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-primary: var(--sage);
+  --font-sans: var(--font);
+  --font-mono: var(--mono);
+  --radius-base: var(--radius);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}

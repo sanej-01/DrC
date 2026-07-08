@@ -8,6 +8,7 @@ import {
   createManagerAlert,
   DEFAULT_RETRY_CONFIG,
 } from "@/lib/retry-logic";
+import { updateAggregatesForPR } from "@/lib/aggregates";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -124,6 +125,9 @@ export async function POST(request: NextRequest) {
         .from("scoring_queue")
         .update({ status: "completed", scored_at: new Date().toISOString() })
         .eq("pr_id", pr_id);
+
+      // Phase 4.4: Update aggregates for developer
+      await updateAggregatesForPR(supabase, pr.workspace_id, pr_id);
 
       // Log to audit_log
       await supabase.from("audit_log").insert({

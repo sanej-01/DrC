@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getPRDiff } from "@/lib/github-client";
 import { routeAndScorePR } from "@/lib/score-router";
+import {
+  classifyError,
+  handleScoringFailure,
+  createManagerAlert,
+  DEFAULT_RETRY_CONFIG,
+} from "@/lib/retry-logic";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -160,8 +166,9 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (scoringError) {
-      // Scoring failed — update queue status and log error
+      // Phase 4.3: Retry fallback — classify error and decide retry strategy
       const errorMessage = scoringError instanceof Error ? scoringError.message : "Unknown error";
+      const errorType = classifyError(scoringError);
 
       const { data: queueEntry } = await supabase
         .from("scoring_queue")
@@ -169,52 +176,50 @@ export async function POST(request: NextRequest) {
         .eq("pr_id", pr_id)
         .single();
 
-      const attemptedCount = (queueEntry?.attempted_count || 0) + 1;
-      const maxAttempts = 3;
+      const currentAttempt = (queueEntry?.attempted_count || 0) + 1;
 
-      if (attemptedCount >= maxAttempts) {
-        // Max attempts reached — mark as failed
-        await supabase.from("scoring_queue").update({
-          status: "failed",
-          error_message: errorMessage,
-          attempted_count: attemptedCount,
-        });
+      // Handle failure and decide retry/alert
+      const failureResult = await handleScoringFailure({
+        pr_id: pr_id,
+        pr_number: pr.number,
+        workspace_id: pr.workspace_id,
+        error_type: errorType,
+        error_message: errorMessage,
+        attempt: currentAttempt,
+        max_attempts: DEFAULT_RETRY_CONFIG.max_attempts,
+        should_retry: false, // Placeholder, will be determined by handleScoringFailure
+      });
 
-        // Alert manager
-        await supabase.from("audit_log").insert({
-          workspace_id: pr.workspace_id,
-          action: "scoring_failed",
-          subject_type: "pr",
-          subject_id: pr_id,
-          details: {
-            pr_number: pr.number,
-            reason: errorMessage,
-            attempts: attemptedCount,
-          },
-        });
+      // If permanent failure, alert manager
+      if (failureResult.alert_manager) {
+        await createManagerAlert(
+          pr.workspace_id,
+          pr_id,
+          pr.number,
+          errorType,
+          errorMessage
+        );
 
         return NextResponse.json(
           {
             error: "Scoring failed after max attempts",
             pr_id: pr_id,
-            attempts: attemptedCount,
+            attempts: currentAttempt,
+            error_type: errorType,
+            manager_alerted: true,
           },
           { status: 500 }
         );
-      } else {
-        // Retry later
-        await supabase.from("scoring_queue").update({
-          status: "pending",
-          error_message: errorMessage,
-          attempted_count: attemptedCount,
-        });
-
+      } else if (failureResult.will_retry) {
+        // Will retry — return with retry info
         return NextResponse.json(
           {
             error: "Scoring failed, will retry",
             pr_id: pr_id,
-            attempts: attemptedCount,
-            max_attempts: maxAttempts,
+            attempts: currentAttempt,
+            max_attempts: DEFAULT_RETRY_CONFIG.max_attempts,
+            error_type: errorType,
+            next_retry_ms: failureResult.next_retry_ms,
           },
           { status: 500 }
         );

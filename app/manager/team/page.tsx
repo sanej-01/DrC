@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
 import { ManualScanButton } from '@/components/manager/ManualScanButton';
 import { ScorePRsButton } from '@/components/manager/ScorePRsButton';
+import { ClearScoresButton } from '@/components/manager/ClearScoresButton';
 import { PRDetailsList } from '@/components/manager/PRDetailsList';
 import { authedFetch } from '@/lib/authed-fetch';
 
@@ -141,6 +142,14 @@ export default function ManagerTeamPage() {
           ).get('workspace_id') || ''}
           onScoreComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
         />
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <ClearScoresButton
+            workspaceId={new URLSearchParams(
+              typeof window !== 'undefined' ? window.location.search : ''
+            ).get('workspace_id') || ''}
+            onCleared={() => setPrDetailsRefreshKey((k) => k + 1)}
+          />
+        </div>
       </div>
 
       {/* Toggle for zero-PR members */}

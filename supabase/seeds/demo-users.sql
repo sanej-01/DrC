@@ -141,12 +141,12 @@ ON CONFLICT (workspace_id, user_id) DO NOTHING;
 -- ============================================================================
 
 SELECT '✓ Setup Complete!' as status;
+SELECT '';
 
-SELECT '' as '';
 SELECT '📋 Workspaces created:' as status;
 SELECT id, name, slug FROM public.workspaces WHERE id LIKE 'ws-demo-%' ORDER BY id;
 
-SELECT '' as '';
+SELECT '';
 SELECT '👥 Workspace members created:' as status;
 SELECT
   wm.workspace_id,
@@ -158,7 +158,7 @@ JOIN auth.users u ON wm.user_id = u.id
 WHERE wm.workspace_id LIKE 'ws-demo-%'
 ORDER BY wm.workspace_id, u.email;
 
-SELECT '' as '';
+SELECT '';
 SELECT '🔑 GitHub OAuth tokens created:' as status;
 SELECT
   workspace_id,
@@ -169,9 +169,9 @@ FROM public.github_oauth_tokens
 WHERE workspace_id LIKE 'ws-demo-%'
 ORDER BY workspace_id;
 
-SELECT '' as '';
+SELECT '';
 SELECT '✅ All demo data seeded successfully!' as status;
-SELECT 'You can now login with:' as '';
-SELECT '  • dev@example.com / Test123!Secure (Developer)' as '';
-SELECT '  • manager@example.com / Test123!Secure (Manager)' as '';
-SELECT '  • admin@example.com / Test123!Secure (Admin)' as '';
+SELECT 'You can now login with:' as info;
+SELECT '  • dev@example.com / Test123!Secure (Developer)' as credentials;
+SELECT '  • manager@example.com / Test123!Secure (Manager)' as credentials;
+SELECT '  • admin@example.com / Test123!Secure (Admin)' as credentials;

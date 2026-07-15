@@ -44,9 +44,9 @@ export async function pollRepositoryPRs(
     prs_duplicated: 0,
   };
 
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+  const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+  try {
     // Get poller metadata for this repo
     const { data: pollerData, error: pollerError } = await supabase
       .from("poller_metadata")

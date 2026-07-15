@@ -151,10 +151,10 @@ export async function recordSecretAlert(
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     // Determine max severity
-    const maxSeverity = findings.reduce((max, f) => {
+    const maxSeverity = findings.reduce<"critical" | "high" | "medium">((max, f) => {
       const severityOrder = { critical: 0, high: 1, medium: 2 };
       return severityOrder[f.severity] < severityOrder[max] ? f.severity : max;
-    }, "medium" as const);
+    }, "medium");
 
     // Create summary message
     const summary = findings.map((f) => `${f.pattern} (${f.count})`).join(", ");

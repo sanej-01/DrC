@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
 
 /**
@@ -10,6 +10,20 @@ import { useAuth } from "@/lib/auth-context";
  * Phase 2.5: Developers accept invite to join workspace
  */
 export default function InvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      }
+    >
+      <InvitePageInner />
+    </Suspense>
+  );
+}
+
+function InvitePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();

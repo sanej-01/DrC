@@ -72,8 +72,15 @@ export async function computeDeveloperAggregates(
 
     if (scores && scores.length > 0) {
       const count = scores.length;
+      type ScoreTotals = {
+        code_quality: number;
+        bug_risk: number;
+        architecture: number;
+        test_coverage: number;
+      };
+
       const sum = scores.reduce(
-        (acc, score) => ({
+        (acc: ScoreTotals, score: Partial<ScoreTotals>): ScoreTotals => ({
           code_quality: acc.code_quality + (score.code_quality || 0),
           bug_risk: acc.bug_risk + (score.bug_risk || 0),
           architecture: acc.architecture + (score.architecture || 0),

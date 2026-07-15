@@ -62,13 +62,13 @@ export default function PRTimeline({ prs }: PRTimelineProps) {
   return (
     <div className="space-y-4">
       {prs.map((pr, idx) => {
-        const hasScores = pr.scores !== undefined;
-        const avgScore = hasScores
+        const scores = pr.scores;
+        const avgScore = scores
           ? Math.round(
-              (pr.scores.code_quality +
-                (100 - pr.scores.bug_risk) +
-                pr.scores.architecture +
-                pr.scores.test_coverage) /
+              (scores.code_quality +
+                (100 - scores.bug_risk) +
+                scores.architecture +
+                scores.test_coverage) /
                 4
             )
           : null;
@@ -127,30 +127,30 @@ export default function PRTimeline({ prs }: PRTimelineProps) {
                 </div>
 
                 {/* Scores */}
-                {hasScores && (
+                {scores && (
                   <div className="grid grid-cols-4 gap-2">
                     <div className="bg-gray-50 rounded px-2 py-1">
                       <p className="text-xs text-gray-600">Quality</p>
-                      <p className={`text-sm font-semibold ${getScoreColor(pr.scores.code_quality)}`}>
-                        {pr.scores.code_quality}
+                      <p className={`text-sm font-semibold ${getScoreColor(scores.code_quality)}`}>
+                        {scores.code_quality}
                       </p>
                     </div>
                     <div className="bg-gray-50 rounded px-2 py-1">
                       <p className="text-xs text-gray-600">Risk</p>
-                      <p className={`text-sm font-semibold ${getScoreColor(100 - pr.scores.bug_risk)}`}>
-                        {100 - pr.scores.bug_risk}
+                      <p className={`text-sm font-semibold ${getScoreColor(100 - scores.bug_risk)}`}>
+                        {100 - scores.bug_risk}
                       </p>
                     </div>
                     <div className="bg-gray-50 rounded px-2 py-1">
                       <p className="text-xs text-gray-600">Architecture</p>
-                      <p className={`text-sm font-semibold ${getScoreColor(pr.scores.architecture)}`}>
-                        {pr.scores.architecture}
+                      <p className={`text-sm font-semibold ${getScoreColor(scores.architecture)}`}>
+                        {scores.architecture}
                       </p>
                     </div>
                     <div className="bg-gray-50 rounded px-2 py-1">
                       <p className="text-xs text-gray-600">Tests</p>
-                      <p className={`text-sm font-semibold ${getScoreColor(pr.scores.test_coverage)}`}>
-                        {pr.scores.test_coverage}
+                      <p className={`text-sm font-semibold ${getScoreColor(scores.test_coverage)}`}>
+                        {scores.test_coverage}
                       </p>
                     </div>
                   </div>

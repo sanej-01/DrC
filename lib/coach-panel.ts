@@ -213,7 +213,7 @@ export async function markQuestionFailed(
   questionId: string,
   error: string
 ): Promise<CoachQuestion> {
-  const { data, err } = await supabase
+  const { data, error: dbError } = await supabase
     .from("coach_questions")
     .update({
       status: "failed",
@@ -224,7 +224,7 @@ export async function markQuestionFailed(
     .select()
     .single();
 
-  if (err) throw err;
+  if (dbError) throw dbError;
 
   return data as CoachQuestion;
 }

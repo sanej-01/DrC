@@ -107,11 +107,19 @@ export async function revokeGitHubToken(accessToken: string): Promise<void> {
     throw new Error("GitHub OAuth config missing");
   }
 
-  const octokit = new Octokit({ auth: accessToken });
+  // Revoking a grant requires Basic Auth with the OAuth app's own
+  // client_id:client_secret — not the user's access token.
+  const basicAuth = Buffer.from(
+    `${githubOAuthClientId}:${githubOAuthClientSecret}`
+  ).toString("base64");
+  const octokit = new Octokit();
 
   // Revoke all tokens for this app from the user's account
-  await octokit.rest.apps.revokeAuthorization({
+  await octokit.rest.apps.deleteAuthorization({
     client_id: githubOAuthClientId,
     access_token: accessToken,
+    headers: {
+      authorization: `Basic ${basicAuth}`,
+    },
   });
 }

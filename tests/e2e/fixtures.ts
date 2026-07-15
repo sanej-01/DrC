@@ -67,7 +67,7 @@ export type AuthedFixtures = {
  * Fixture: Pre-authenticated page as developer
  */
 export const authenticatedDeveloper = base.extend<AuthedFixtures>({
-  developerPage: async ({ page }, use) => {
+  developerPage: async ({ page }: any, use: any) => {
     // TODO: Implement login flow
     // await page.goto('/auth/sign-in');
     // await page.fill('input[name="email"]', TEST_USERS.developer.email);
@@ -83,7 +83,7 @@ export const authenticatedDeveloper = base.extend<AuthedFixtures>({
  * Fixture: Pre-authenticated page as manager
  */
 export const authenticatedManager = base.extend<AuthedFixtures>({
-  managerPage: async ({ page }, use) => {
+  managerPage: async ({ page }: any, use: any) => {
     // TODO: Implement login flow as manager
     await use(page);
   },

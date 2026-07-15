@@ -15,7 +15,7 @@ interface TeamMember {
   email: string;
   github_handle?: string;
   role: string;
-  stage: string;
+  stage: 'flourishing' | 'mature' | 'sapling' | 'seedling' | 'no_data';
   pr_count: number;
   score_30d: number | null;
   confidence: string;

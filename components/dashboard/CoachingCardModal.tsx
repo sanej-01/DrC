@@ -21,14 +21,15 @@ interface FeedbackItem {
 
 interface CoachingCard {
   id: string;
-  pr_id: string;
-  pr_number: number;
+  pr_id?: string;
+  pr_number?: number;
   dimension: string;
   title: string;
   description: string;
   severity: 'GOOD' | 'IMPROVE' | 'FIX' | 'SUGGEST';
   file_path?: string;
-  created_at: string;
+  line_number?: number;
+  created_at?: string;
   feedback_items?: FeedbackItem[];
 }
 
@@ -280,7 +281,7 @@ export default function CoachingCardModal({
 
             {/* Metadata */}
             <div className="text-xs text-gray-500 pt-4 border-t border-gray-200">
-              <p>Feedback from: {new Date(card.created_at).toLocaleDateString()}</p>
+              <p>Feedback from: {card.created_at ? new Date(card.created_at).toLocaleDateString() : 'Unknown date'}</p>
             </div>
           </div>
 

@@ -200,7 +200,7 @@ export function validateScoringResult(result: any): result is ScoringResult {
   const hasFeedback =
     Array.isArray(result.feedback) &&
     result.feedback.every(
-      (f) =>
+      (f: any) =>
         ["GOOD", "IMPROVE", "FIX", "SUGGEST"].includes(f.type) &&
         ["code_quality", "bug_risk", "architecture", "test_coverage"].includes(f.dimension) &&
         typeof f.title === "string" &&

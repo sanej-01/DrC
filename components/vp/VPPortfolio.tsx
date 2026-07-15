@@ -159,7 +159,7 @@ export default function VPPortfolio({ workspaceId }: VPPortfolioProps) {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="text-sm text-gray-600 mb-1">Avg 30-Day Score</div>
             <div className="text-3xl font-bold text-gray-900">
-              {snapshot.avg_score_30d !== null
+              {snapshot.avg_score_30d != null
                 ? Math.round(snapshot.avg_score_30d)
                 : '—'}
             </div>
@@ -295,18 +295,18 @@ export default function VPPortfolio({ workspaceId }: VPPortfolioProps) {
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <div className="font-semibold text-gray-900">
-                          {team.overall_score_30d !== null
+                          {team.overall_score_30d != null
                             ? Math.round(team.overall_score_30d)
                             : '—'}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {team.avg_code_quality_30d !== null
+                        {team.avg_code_quality_30d != null
                           ? Math.round(team.avg_code_quality_30d)
                           : '—'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {team.avg_bug_risk_30d !== null
+                        {team.avg_bug_risk_30d != null
                           ? Math.round(100 - team.avg_bug_risk_30d)
                           : '—'}
                       </td>

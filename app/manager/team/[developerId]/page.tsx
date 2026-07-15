@@ -28,7 +28,7 @@ interface IndividualStats {
     pr_count_90d: number;
     pr_count_60d: number;
     pr_count_30d: number;
-    trend: string;
+    trend: 'improving' | 'declining' | 'stable';
   };
   coaching: {
     total: number;

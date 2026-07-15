@@ -198,8 +198,11 @@ function calculateOverallScore(dims: {
   return Math.round((quality + riskInverted + architecture + tests) / 4);
 }
 
-function calculateTrend(score90d: number | null, score30d: number | null): string {
-  if (!score90d || !score30d) return "neutral";
+function calculateTrend(
+  score90d: number | null,
+  score30d: number | null
+): "improving" | "declining" | "stable" {
+  if (!score90d || !score30d) return "stable";
   const diff = score30d - score90d;
   if (diff > 5) return "improving";
   if (diff < -5) return "declining";

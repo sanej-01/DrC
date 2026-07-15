@@ -252,7 +252,30 @@ export async function pollRepositoryPRs(
  * loses the actual reason (e.g. "relation does not exist").
  */
 function extractErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    // Octokit's RequestError extends Error but carries the useful
+    // diagnostic info (HTTP status, request URL, GitHub's own message)
+    // as extra properties that `.message` alone doesn't show.
+    const details = [error.message];
+    const anyError = error as {
+      status?: number;
+      request?: { url?: string };
+      response?: { data?: { message?: string } };
+    };
+    if (typeof anyError.status === "number") {
+      details.push(`status=${anyError.status}`);
+    }
+    if (typeof anyError.request?.url === "string") {
+      details.push(`url=${anyError.request.url}`);
+    }
+    if (
+      typeof anyError.response?.data?.message === "string" &&
+      anyError.response.data.message !== error.message
+    ) {
+      details.push(`github_message=${anyError.response.data.message}`);
+    }
+    return details.join(" | ");
+  }
   if (
     error &&
     typeof error === "object" &&

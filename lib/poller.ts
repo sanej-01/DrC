@@ -79,21 +79,20 @@ export async function pollRepositoryPRs(
     // Fetch recent merged PRs from GitHub
     const octokit = new Octokit({ auth: userGitHubToken });
 
-    // Poll for PRs created in last 24 hours (more frequent than backfill)
-    const since24hAgo = new Date();
-    since24hAgo.setHours(since24hAgo.getHours() - 24);
-
     const prs: any[] = [];
     let page = 1;
     let hasMore = true;
 
     while (hasMore) {
       try {
+        // Note: the GitHub REST "list pull requests" endpoint has no
+        // `since` parameter (that only exists on issues/commits list
+        // endpoints) - closed PRs are paged through and filtered to
+        // merged ones below instead.
         const { data: pageData } = await octokit.rest.pulls.list({
           owner: githubOwner,
           repo: githubRepo,
           state: "closed",
-          since: since24hAgo.toISOString(),
           per_page: 100,
           page,
         });
@@ -108,8 +107,12 @@ export async function pollRepositoryPRs(
 
         page++;
       } catch (pageError) {
+        // Surface this instead of only logging it server-side - a bad
+        // token or inaccessible repo would otherwise look like a clean
+        // scan that just happened to find 0 PRs.
+        const message = extractErrorMessage(pageError);
         console.error(`Poller error fetching page ${page}:`, pageError);
-        // Continue with what we have
+        result.error = result.error ? `${result.error}; ${message}` : message;
         hasMore = false;
       }
     }

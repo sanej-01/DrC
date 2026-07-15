@@ -120,22 +120,6 @@ export async function pollRepositoryPRs(
 
     result.prs_checked = prs.length;
 
-    // No PR history at all for this repo - fall back to a general
-    // commit-history-based review so there's still something to score
-    // and show in PR Details, instead of the scan just reporting 0
-    // forever for repos that never used GitHub's PR feature.
-    if (prs.length === 0) {
-      await enqueueGeneralHistoryFallback(
-        supabase,
-        octokit,
-        workspaceId,
-        repoId,
-        githubOwner,
-        githubRepo,
-        result
-      );
-    }
-
     // Check for duplicates and enqueue new PRs
     for (const pr of prs) {
       try {
@@ -167,6 +151,7 @@ export async function pollRepositoryPRs(
         let additions = pr.additions;
         let deletions = pr.deletions;
         let changedFiles = pr.changed_files;
+        let mergeCommitSha = pr.merge_commit_sha;
         try {
           const { data: fullPr } = await octokit.rest.pulls.get({
             owner: githubOwner,
@@ -176,6 +161,7 @@ export async function pollRepositoryPRs(
           additions = fullPr.additions;
           deletions = fullPr.deletions;
           changedFiles = fullPr.changed_files;
+          mergeCommitSha = fullPr.merge_commit_sha;
         } catch (detailError) {
           console.warn(`Failed to fetch full PR details for #${pr.number}:`, detailError);
           // Fall back to whatever the list response had (likely undefined)
@@ -198,6 +184,7 @@ export async function pollRepositoryPRs(
             additions_count: additions,
             deletions_count: deletions,
             files_changed_count: changedFiles,
+            merge_commit_sha: mergeCommitSha,
           });
 
         if (insertError) {
@@ -231,6 +218,21 @@ export async function pollRepositoryPRs(
         continue;
       }
     }
+
+    // Cover activity that never went through a tracked PR at all - a
+    // direct push to main, or a branch merged locally with `git merge`
+    // instead of GitHub's "Open a pull request" flow. Runs regardless
+    // of whether this repo also has real PRs, since PR coverage can be
+    // partial (some branches merged properly, others not).
+    await enqueueGeneralHistoryFallback(
+      supabase,
+      octokit,
+      workspaceId,
+      repoId,
+      githubOwner,
+      githubRepo,
+      result
+    );
 
     // Update poller metadata
     const nextPollTime = new Date();
@@ -294,10 +296,17 @@ export async function pollRepositoryPRs(
 const GENERAL_REVIEW_LOOKBACK_DAYS = 90;
 
 /**
- * Fallback for repos with zero merged PRs (e.g. everything was pushed
- * directly to main, or merged without going through GitHub's PR
- * feature). Instead of the scan reporting 0 PRs forever, summarize the
- * last ~90 days of commit activity as one synthetic pull_requests row
+ * Fallback for commit activity that no tracked PR accounts for -
+ * direct pushes to main, or a branch merged locally with `git merge`
+ * instead of GitHub's "Open a pull request" flow. This runs on every
+ * scan (not just when a repo has zero PRs total), since PR coverage
+ * can be partial: a repo can have some real, trackable PRs and still
+ * have other merges that never went through one.
+ *
+ * A PR's merge_commit_sha is the commit it produced on the base
+ * branch, so commits already covered by a tracked PR are excluded by
+ * comparing against every merge_commit_sha already stored for this
+ * repo. What's left is summarized as one synthetic pull_requests row
  * so there's still something for score-prs to analyze and for the PR
  * Details section to display.
  *
@@ -320,15 +329,31 @@ async function enqueueGeneralHistoryFallback(
     const since = new Date();
     since.setDate(since.getDate() - GENERAL_REVIEW_LOOKBACK_DAYS);
 
-    const { data: commits } = await octokit.rest.repos.listCommits({
+    const { data: allCommits } = await octokit.rest.repos.listCommits({
       owner: githubOwner,
       repo: githubRepo,
       since: since.toISOString(),
       per_page: 100,
     });
 
-    if (!commits || commits.length === 0) {
+    if (!allCommits || allCommits.length === 0) {
       return; // Nothing pushed in the lookback window either
+    }
+
+    const { data: trackedPrs } = await supabase
+      .from("pull_requests")
+      .select("merge_commit_sha")
+      .eq("repo_id", repoId)
+      .not("merge_commit_sha", "is", null);
+
+    const trackedShas = new Set(
+      (trackedPrs || []).map((p: { merge_commit_sha: string }) => p.merge_commit_sha)
+    );
+
+    const commits = allCommits.filter((c) => !trackedShas.has(c.sha));
+
+    if (commits.length === 0) {
+      return; // Every recent commit is already covered by a tracked PR
     }
 
     const pr_node_id = `general-review:${githubOwner}/${githubRepo}`;

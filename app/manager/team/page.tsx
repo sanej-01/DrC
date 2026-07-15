@@ -9,8 +9,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
 import { ManualScanButton } from '@/components/manager/ManualScanButton';
-import { ScorePRsButton } from '@/components/manager/ScorePRsButton';
-import { ClearScoresButton } from '@/components/manager/ClearScoresButton';
 import { PRDetailsList } from '@/components/manager/PRDetailsList';
 import { authedFetch } from '@/lib/authed-fetch';
 
@@ -48,6 +46,7 @@ export default function ManagerTeamPage() {
   const [error, setError] = useState<string | null>(null);
   const [includeZeroPR, setIncludeZeroPR] = useState(false);
   const [prDetailsRefreshKey, setPrDetailsRefreshKey] = useState(0);
+  const [hasPrData, setHasPrData] = useState<boolean | null>(null);
 
   useEffect(() => {
     const fetchTeamStats = async () => {
@@ -122,35 +121,21 @@ export default function ManagerTeamPage() {
         </p>
       </div>
 
-      {/* Manual GitHub Scan */}
-      <div className="mb-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">GitHub PR Scanning</h2>
-        <ManualScanButton
-          workspaceId={new URLSearchParams(
-            typeof window !== 'undefined' ? window.location.search : ''
-          ).get('workspace_id') || ''}
-          onScanComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
-        />
-      </div>
-
-      {/* Manual PR Scoring (test-only) */}
-      <div className="mb-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">PR Scoring (Manual Test)</h2>
-        <ScorePRsButton
-          workspaceId={new URLSearchParams(
-            typeof window !== 'undefined' ? window.location.search : ''
-          ).get('workspace_id') || ''}
-          onScoreComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
-        />
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <ClearScoresButton
+      {/* Manual GitHub Scan - only shown until there's real scan/PR
+          history; once data exists, the same action lives in the
+          account menu (top right) instead of taking up page space. */}
+      {hasPrData === false && (
+        <div className="mb-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">GitHub PR Scanning</h2>
+          <ManualScanButton
             workspaceId={new URLSearchParams(
               typeof window !== 'undefined' ? window.location.search : ''
             ).get('workspace_id') || ''}
-            onCleared={() => setPrDetailsRefreshKey((k) => k + 1)}
+            onScanComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
+            onScoreComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
           />
         </div>
-      </div>
+      )}
 
       {/* Toggle for zero-PR members */}
       <div className="mb-8 flex items-center gap-3">
@@ -187,6 +172,7 @@ export default function ManagerTeamPage() {
             typeof window !== 'undefined' ? window.location.search : ''
           ).get('workspace_id') || ''}
           refreshKey={prDetailsRefreshKey}
+          onDataLoaded={(count) => setHasPrData(count > 0)}
         />
       </div>
     </div>

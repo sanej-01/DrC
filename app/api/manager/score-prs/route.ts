@@ -238,6 +238,16 @@ export async function POST(request: NextRequest) {
           );
           diff = content;
           filesChangedCount = fileCount;
+
+          // The stored PR row was created at scan time with
+          // files_changed_count hardcoded to 0 (there's no real diff
+          // to measure yet at that point) - now that we know how many
+          // files were actually reviewed, correct it so PR Details
+          // shows real numbers instead of "0 files".
+          await supabase
+            .from("pull_requests")
+            .update({ files_changed_count: fileCount })
+            .eq("id", pr.id);
         } else {
           try {
             const { data } = await octokit.rest.pulls.get({

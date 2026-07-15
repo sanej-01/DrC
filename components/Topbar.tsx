@@ -1,12 +1,20 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { authedFetch } from "@/lib/authed-fetch";
 
 export default function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const workspaceId = searchParams.get("workspace_id") || "";
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [statusText, setStatusText] = useState<{ text: string; isError: boolean } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const activeRole = pathname.startsWith("/manager")
     ? "mgr"
@@ -21,6 +29,86 @@ export default function Topbar() {
       router.push(`/manager/team${workspaceId ? `?workspace_id=${workspaceId}` : ""}`);
     }
     // VP dashboard doesn't exist yet — tab is disabled below
+  };
+
+  // Close the menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [menuOpen]);
+
+  const handleScan = async () => {
+    setIsScanning(true);
+    setStatusText(null);
+    try {
+      const scanResponse = await authedFetch("/api/manager/scan-github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      const scanData = await scanResponse.json();
+      if (!scanResponse.ok) throw new Error(scanData.error || "Scan failed");
+
+      await authedFetch("/api/manager/score-prs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+
+      setStatusText({
+        text: `Scanned ${scanData.repos_scanned} repo(s), enqueued ${scanData.prs_enqueued} PR(s)`,
+        isError: false,
+      });
+      router.refresh();
+    } catch (err) {
+      setStatusText({
+        text: err instanceof Error ? err.message : "Scan failed",
+        isError: true,
+      });
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleClear = async () => {
+    if (
+      !confirm(
+        "Clear all PR scores AND PR history for this workspace? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+    setIsClearing(true);
+    setStatusText(null);
+    try {
+      const response = await authedFetch("/api/manager/clear-pr-scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to clear");
+
+      setStatusText({
+        text: `Cleared ${data.scores_cleared} score(s) and ${data.prs_cleared} PR(s)`,
+        isError: false,
+      });
+      router.refresh();
+    } catch (err) {
+      setStatusText({
+        text: err instanceof Error ? err.message : "Failed to clear",
+        isError: true,
+      });
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   return (
@@ -94,15 +182,68 @@ export default function Topbar() {
         🔔
       </button>
 
-      {/* Avatar */}
-      <button
-        onClick={() => router.push("/auth/sign-out")}
-        className="w-[36px] h-[36px] rounded-full flex items-center justify-center font-semibold text-xs border-0 cursor-pointer"
-        style={{ background: "var(--clay-soft)", color: "var(--clay)" }}
-        title="Sign out"
-      >
-        PR
-      </button>
+      {/* Avatar + dropdown */}
+      <div className="relative" ref={menuRef}>
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className="w-[36px] h-[36px] rounded-full flex items-center justify-center font-semibold text-xs border-0 cursor-pointer"
+          style={{ background: "var(--clay-soft)", color: "var(--clay)" }}
+          title="Account menu"
+        >
+          PR
+        </button>
+
+        {menuOpen && (
+          <div
+            className="absolute right-0 top-[46px] w-[280px] rounded-[10px] overflow-hidden z-50"
+            style={{
+              background: "#fff",
+              border: "1px solid var(--line)",
+              boxShadow: "var(--shadow)",
+            }}
+          >
+            {workspaceId && (
+              <>
+                <button
+                  onClick={handleScan}
+                  disabled={isScanning}
+                  className="w-full text-left px-4 py-3 text-sm border-0 bg-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  style={{ color: "var(--ink)" }}
+                >
+                  {isScanning ? "Scanning & scoring…" : "Scan GitHub Now"}
+                </button>
+                <button
+                  onClick={handleClear}
+                  disabled={isClearing}
+                  className="w-full text-left px-4 py-3 text-sm border-0 bg-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  style={{ color: "var(--bad)" }}
+                >
+                  {isClearing ? "Clearing…" : "Clear PR Scores & History"}
+                </button>
+                {statusText && (
+                  <div
+                    className="px-4 py-2 text-xs"
+                    style={{
+                      color: statusText.isError ? "var(--bad)" : "var(--ink-2)",
+                      borderTop: "1px solid var(--line)",
+                    }}
+                  >
+                    {statusText.text}
+                  </div>
+                )}
+                <div style={{ borderTop: "1px solid var(--line)" }} />
+              </>
+            )}
+            <button
+              onClick={() => router.push("/auth/sign-out")}
+              className="w-full text-left px-4 py-3 text-sm border-0 bg-transparent cursor-pointer hover:bg-gray-50"
+              style={{ color: "var(--ink)" }}
+            >
+              Sign out
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

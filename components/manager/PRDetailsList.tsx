@@ -54,9 +54,10 @@ function getScoreColor(score: number): string {
 interface PRDetailsListProps {
   workspaceId: string;
   refreshKey?: number;
+  onDataLoaded?: (count: number) => void;
 }
 
-export function PRDetailsList({ workspaceId, refreshKey }: PRDetailsListProps) {
+export function PRDetailsList({ workspaceId, refreshKey, onDataLoaded }: PRDetailsListProps) {
   const [prs, setPrs] = useState<PRDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export function PRDetailsList({ workspaceId, refreshKey }: PRDetailsListProps) {
 
         const data = await response.json();
         setPrs(data.prs || []);
+        onDataLoaded?.((data.prs || []).length);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load PR details');
       } finally {
@@ -87,6 +89,9 @@ export function PRDetailsList({ workspaceId, refreshKey }: PRDetailsListProps) {
     };
 
     fetchDetails();
+    // onDataLoaded intentionally excluded - it's a parent callback, not
+    // fetch input; including it would refetch on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, refreshKey]);
 
   if (loading) {

@@ -18,9 +18,21 @@ Demo credentials (from `tests/e2e/fixtures.ts`):
 
 ## Setup Steps
 
+### Step 0: Prerequisites
+
+The SQL seed script will:
+- ✅ Create all necessary tables (workspaces, workspace_members, github_oauth_tokens, audit_log)
+- ✅ Create indexes for performance
+- ✅ Seed demo workspaces and memberships
+- ⚠️ **Requires**: Auth users to already exist in Supabase Auth
+
+**Important**: You must create auth users first before seeding the database. See Step 1 below.
+
+---
+
 ### Step 1: Create Auth Users in Supabase
 
-Auth users must be created first. Choose one method:
+Auth users must be created in Supabase Auth first. The SQL seed script cannot create auth users—it only creates database records and links them to existing auth users. Choose one method:
 
 #### Option A: Supabase Dashboard (Manual)
 1. Go to [Supabase Dashboard](https://app.supabase.com)

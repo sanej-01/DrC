@@ -212,6 +212,7 @@ export async function pollRepositoryPRs(
     return result;
   } catch (error) {
     console.error("Poller error:", error);
+    const errorMessage = extractErrorMessage(error);
 
     // Update metadata with error status
     try {
@@ -219,7 +220,7 @@ export async function pollRepositoryPRs(
         .from("poller_metadata")
         .update({
           status: "failed",
-          error_message: error instanceof Error ? error.message : "Unknown error",
+          error_message: errorMessage,
         })
         .eq("workspace_id", workspaceId)
         .eq("repo_id", repoId);
@@ -230,14 +231,37 @@ export async function pollRepositoryPRs(
         repo_id: repoId,
         poll_completed_at: new Date().toISOString(),
         status: "failed",
-        error_message: error instanceof Error ? error.message : "Unknown error",
+        error_message: errorMessage,
       });
     } catch (logError) {
       console.error("Error logging poller failure:", logError);
     }
 
-    result.error = error instanceof Error ? error.message : "Unknown error";
+    result.error = errorMessage;
     return result;
+  }
+}
+
+/**
+ * Extract a readable message from any thrown value. Supabase/PostgREST
+ * errors are plain objects with a `message` property, not real Error
+ * instances, so `error instanceof Error` misses them and silently
+ * loses the actual reason (e.g. "relation does not exist").
+ */
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Unknown error";
   }
 }
 

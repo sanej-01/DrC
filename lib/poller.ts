@@ -268,7 +268,7 @@ export async function pollWorkspacePRs(
     for (const repo of repos) {
       const result = await pollRepositoryPRs(
         workspaceId,
-        repo.id,
+        repo.repo_id,
         repo.owner,
         repo.name,
         userGitHubToken

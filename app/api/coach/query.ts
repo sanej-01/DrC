@@ -64,36 +64,58 @@ export async function POST(request: NextRequest) {
       "manager" // TODO: get from auth context
     );
 
-    // Call Anthropic API
-    const anthropic = await import("@anthropic-ai/sdk");
-    const client = new anthropic.Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    // Call OpenRouter API
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+    const OPENROUTER_BASE_URL = "https://openrouter.io/api/v1";
+    const COACH_MODEL = "openai/gpt-4"; // Use GPT-4 for coaching (higher quality)
 
     const startTime = Date.now();
 
-    const message = await client.messages.create({
-      model: "claude-opus-4-1-20250805",
-      max_tokens: 1024,
-      system: getCoachSystemPrompt(),
-      messages: [
-        {
-          role: "user",
-          content: `${context}\n\nQuestion: ${question}`,
-        },
-      ],
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://dr-codium.com",
+        "X-Title": "Dr Codium",
+      },
+      body: JSON.stringify({
+        model: COACH_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: getCoachSystemPrompt(),
+          },
+          {
+            role: "user",
+            content: `${context}\n\nQuestion: ${question}`,
+          },
+        ],
+        max_tokens: 1024,
+      }),
     });
 
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenRouter coach query failed: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
     const latencyMs = Date.now() - startTime;
-    const response = message.content[0].type === "text" ? message.content[0].text : "";
+    const responseText = data.choices?.[0]?.message?.content || "";
+    const totalTokens = (data.usage?.prompt_tokens || 0) + (data.usage?.completion_tokens || 0);
+
+    if (!responseText) {
+      throw new Error("Empty response from coach model");
+    }
 
     // Update question with response
     const updatedQuestion = await updateCoachResponse(
       supabase,
       coachQuestion.id,
-      response,
-      "claude-opus-4-1-20250805",
-      message.usage.input_tokens + message.usage.output_tokens,
+      responseText,
+      COACH_MODEL,
+      totalTokens,
       latencyMs
     );
 
@@ -104,8 +126,8 @@ export async function POST(request: NextRequest) {
       user_id: authHeader,
       subject_developer_id: subjectDeveloperId,
       action: "response_received",
-      context_summary: `Query about developer performance (${message.usage.input_tokens} input tokens)`,
-      model_used: "claude-opus-4-1-20250805",
+      context_summary: `Query about developer performance (${data.usage?.prompt_tokens || 0} input tokens)`,
+      model_used: COACH_MODEL,
     });
 
     return NextResponse.json({ question: updatedQuestion });

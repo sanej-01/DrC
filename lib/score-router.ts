@@ -3,18 +3,22 @@
  * Phase 4.2: Model routing with cost optimization
  *
  * Strategy:
- * 1. Haiku triage: Quick assessment (cheap, fast)
- * 2. If should_score: Sonnet full scoring (more capable)
+ * 1. OpenRouter triage: Quick assessment (cheap, fast)
+ * 2. If should_score: OpenRouter full scoring (more capable)
  * 3. Log model_version, tokens, latency, cost
  * 4. Fetch diff in-memory only (never stored)
+ *
+ * Uses OpenRouter API (compatible with multiple models)
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { buildScoringPrompt, buildTriagePrompt, validateScoringResult, ScoringResult } from "./scoring-prompt";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const OPENROUTER_BASE_URL = "https://openrouter.io/api/v1";
+
+// Model selection via OpenRouter
+const TRIAGE_MODEL = "openai/gpt-3.5-turbo"; // Fast, cheap triage
+const SCORING_MODEL = "openai/gpt-4"; // More capable scoring
 
 export interface ScoringAuditEntry {
   triage_model: string;
@@ -32,8 +36,8 @@ export interface ScoringAuditEntry {
 }
 
 /**
- * Haiku triage: Quick assessment if PR needs full scoring
- * Models: claude-3-haiku-20240307
+ * Triage: Quick assessment if PR needs full scoring
+ * Uses OpenRouter for model flexibility
  */
 async function triagePR(
   prNumber: number,
@@ -52,30 +56,45 @@ async function triagePR(
   const prompt = buildTriagePrompt(prNumber, title, author, files_changed, additions, deletions);
   const startTime = Date.now();
 
-  const response = await client.messages.create({
-    model: "claude-3-haiku-20240307",
-    max_tokens: 200,
-    messages: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "HTTP-Referer": "https://dr-codium.com",
+      "X-Title": "Dr Codium",
+    },
+    body: JSON.stringify({
+      model: TRIAGE_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: 200,
+    }),
   });
 
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`OpenRouter triage failed: ${response.status} - ${error}`);
+  }
+
+  const data = await response.json();
   const latency = Date.now() - startTime;
-  const tokens_in = response.usage.input_tokens;
-  const tokens_out = response.usage.output_tokens;
+  const tokens_in = data.usage?.prompt_tokens || 0;
+  const tokens_out = data.usage?.completion_tokens || 0;
 
   // Parse response
-  const content = response.content[0];
-  if (content.type !== "text") {
-    throw new Error("Expected text response from triage");
+  const text = data.choices?.[0]?.message?.content || "";
+  if (!text) {
+    throw new Error("Empty response from triage");
   }
 
   try {
     // Try to extract JSON
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("No JSON found in triage response");
     }
@@ -89,7 +108,7 @@ async function triagePR(
       latency_ms: latency,
     };
   } catch (parseError) {
-    console.warn("Failed to parse triage response:", content.text);
+    console.warn("Failed to parse triage response:", text);
     // Default to scoring if triage parsing fails
     return {
       should_score: true,
@@ -102,8 +121,8 @@ async function triagePR(
 }
 
 /**
- * Sonnet full scoring: Comprehensive assessment
- * Models: claude-3-sonnet-20240229
+ * Full scoring: Comprehensive assessment
+ * Uses OpenRouter for model flexibility
  */
 async function scorePR(
   prNumber: number,
@@ -122,30 +141,45 @@ async function scorePR(
   const prompt = buildScoringPrompt(prNumber, title, author, files_changed, additions, deletions, diff);
   const startTime = Date.now();
 
-  const response = await client.messages.create({
-    model: "claude-3-sonnet-20240229",
-    max_tokens: 1000,
-    messages: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "HTTP-Referer": "https://dr-codium.com",
+      "X-Title": "Dr Codium",
+    },
+    body: JSON.stringify({
+      model: SCORING_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: 1000,
+    }),
   });
 
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`OpenRouter scoring failed: ${response.status} - ${error}`);
+  }
+
+  const data = await response.json();
   const latency = Date.now() - startTime;
-  const tokens_in = response.usage.input_tokens;
-  const tokens_out = response.usage.output_tokens;
+  const tokens_in = data.usage?.prompt_tokens || 0;
+  const tokens_out = data.usage?.completion_tokens || 0;
 
   // Parse response
-  const content = response.content[0];
-  if (content.type !== "text") {
-    throw new Error("Expected text response from scoring");
+  const text = data.choices?.[0]?.message?.content || "";
+  if (!text) {
+    throw new Error("Empty response from scoring");
   }
 
   try {
     // Try to extract JSON
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("No JSON found in scoring response");
     }
@@ -164,7 +198,7 @@ async function scorePR(
       latency_ms: latency,
     };
   } catch (parseError) {
-    console.error("Failed to parse scoring response:", content.text);
+    console.error("Failed to parse scoring response:", text);
     throw new Error(`Scoring parsing failed: ${parseError instanceof Error ? parseError.message : "Unknown error"}`);
   }
 }

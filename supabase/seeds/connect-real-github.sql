@@ -22,7 +22,8 @@ WHERE workspace_id = 'ws-demo-001'
 -- 2. Remove the fake demo repos so the scan only hits your real one
 DELETE FROM public.repos WHERE id IN ('repo-demo-001', 'repo-demo-002');
 
--- 3. Add your real repo
+-- 3. Add your real repo (safe to re-run: updates in place if it
+--    already exists instead of erroring on the duplicate id)
 INSERT INTO public.repos (id, workspace_id, repo_id, owner, name, full_name, description, url, is_active, created_at, updated_at)
 VALUES (
   'repo-real-001',
@@ -36,7 +37,14 @@ VALUES (
   true,
   NOW(),
   NOW()
-);
+)
+ON CONFLICT (id) DO UPDATE SET
+  owner = EXCLUDED.owner,
+  name = EXCLUDED.name,
+  full_name = EXCLUDED.full_name,
+  url = EXCLUDED.url,
+  is_active = EXCLUDED.is_active,
+  updated_at = NOW();
 
 -- Verification
 SELECT '🔑 Token now in use:' as status;

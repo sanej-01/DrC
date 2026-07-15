@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
       .from("pull_requests")
       .insert({
         workspace_id: repo.workspace_id,
-        repo_id: repo.id,
+        repo_id: repo.repo_id,
         github_pr_id: prMetadata.github_pr_id,
         pr_node_id: prMetadata.pr_node_id,
         title: prMetadata.title,

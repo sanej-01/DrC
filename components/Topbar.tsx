@@ -1,9 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export default function Topbar() {
-  const [role, setRole] = useState<"dev" | "mgr" | "vp">("mgr");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const workspaceId = searchParams.get("workspace_id") || "";
+
+  const activeRole = pathname.startsWith("/manager")
+    ? "mgr"
+    : pathname.startsWith("/dashboard")
+      ? "dev"
+      : null;
+
+  const goTo = (role: "dev" | "mgr" | "vp") => {
+    if (role === "dev") {
+      router.push(`/dashboard${workspaceId ? `?workspace_id=${workspaceId}` : ""}`);
+    } else if (role === "mgr") {
+      router.push(`/manager/team${workspaceId ? `?workspace_id=${workspaceId}` : ""}`);
+    }
+    // VP dashboard doesn't exist yet — tab is disabled below
+  };
 
   return (
     <div
@@ -15,7 +33,10 @@ export default function Topbar() {
       }}
     >
       {/* Brand */}
-      <div className="flex items-center gap-[10px]">
+      <button
+        onClick={() => router.push("/")}
+        className="flex items-center gap-[10px] border-0 bg-transparent cursor-pointer"
+      >
         <div
           className="w-[30px] h-[30px] rounded-[9px] flex items-center justify-center font-bold text-sm text-white"
           style={{ background: "var(--sage)" }}
@@ -23,7 +44,7 @@ export default function Topbar() {
           Dx
         </div>
         <div className="font-semibold text-base tracking-tight">Dr Codium</div>
-      </div>
+      </button>
 
       {/* Spacer */}
       <div className="flex-1" />
@@ -33,25 +54,32 @@ export default function Topbar() {
         className="flex gap-[3px] px-[3px] rounded-[10px]"
         style={{ background: "var(--bg)", border: "1px solid var(--line)" }}
       >
-        {(["dev", "mgr", "vp"] as const).map((r) => (
-          <button
-            key={r}
-            onClick={() => setRole(r)}
-            className="border-0 font-inherit text-xs px-3 py-[6px] rounded-[7px] cursor-pointer transition-all"
-            style={{
-              background: role === r ? "#fff" : "transparent",
-              color: role === r ? "var(--ink)" : "var(--ink-2)",
-              fontWeight: role === r ? "500" : "400",
-              boxShadow: role === r ? "var(--shadow)" : "none",
-            }}
-          >
-            {r === "dev"
-              ? "Developer"
-              : r === "mgr"
-                ? "Manager"
-                : "Director / VP"}
-          </button>
-        ))}
+        {(["dev", "mgr", "vp"] as const).map((r) => {
+          const disabled = r === "vp";
+          const isActive = activeRole === r;
+          return (
+            <button
+              key={r}
+              onClick={() => !disabled && goTo(r)}
+              disabled={disabled}
+              className="border-0 font-inherit text-xs px-3 py-[6px] rounded-[7px] transition-all"
+              style={{
+                background: isActive ? "#fff" : "transparent",
+                color: disabled ? "var(--line)" : isActive ? "var(--ink)" : "var(--ink-2)",
+                fontWeight: isActive ? "500" : "400",
+                boxShadow: isActive ? "var(--shadow)" : "none",
+                cursor: disabled ? "not-allowed" : "pointer",
+              }}
+              title={disabled ? "Coming soon" : undefined}
+            >
+              {r === "dev"
+                ? "Developer"
+                : r === "mgr"
+                  ? "Manager"
+                  : "Director / VP"}
+            </button>
+          );
+        })}
       </div>
 
       {/* Bell */}
@@ -67,12 +95,14 @@ export default function Topbar() {
       </button>
 
       {/* Avatar */}
-      <div
-        className="w-[36px] h-[36px] rounded-full flex items-center justify-center font-semibold text-xs"
+      <button
+        onClick={() => router.push("/auth/sign-out")}
+        className="w-[36px] h-[36px] rounded-full flex items-center justify-center font-semibold text-xs border-0 cursor-pointer"
         style={{ background: "var(--clay-soft)", color: "var(--clay)" }}
+        title="Sign out"
       >
         PR
-      </div>
+      </button>
     </div>
   );
 }

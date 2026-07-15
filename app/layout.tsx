@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth-context";
+import AppChrome from "@/components/AppChrome";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="h-screen overflow-hidden" style={{ background: "var(--bg)", color: "var(--ink)" }}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <AppChrome>{children}</AppChrome>
+        </AuthProvider>
       </body>
     </html>
   );

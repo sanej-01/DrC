@@ -49,7 +49,7 @@ export default function Home() {
   if (error) {
     return (
       <div
-        className="flex items-center justify-center h-screen"
+        className="flex items-center justify-center h-full"
         style={{ background: "var(--bg)" }}
       >
         <div className="text-center">
@@ -72,7 +72,7 @@ export default function Home() {
 
   return (
     <div
-      className="flex items-center justify-center h-screen"
+      className="flex items-center justify-center h-full"
       style={{ background: "var(--bg)" }}
     >
       <div style={{ color: "var(--ink-2)" }}>Loading...</div>

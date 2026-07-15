@@ -159,6 +159,28 @@ export async function pollRepositoryPRs(
           continue;
         }
 
+        // GitHub's "list pull requests" endpoint (used above) doesn't
+        // include additions/deletions/changed_files - those only exist
+        // on the "get a single pull request" response. Fetch it so the
+        // stored stats (and the scoring triage step, which skips PRs it
+        // thinks have 0 files changed) reflect reality.
+        let additions = pr.additions;
+        let deletions = pr.deletions;
+        let changedFiles = pr.changed_files;
+        try {
+          const { data: fullPr } = await octokit.rest.pulls.get({
+            owner: githubOwner,
+            repo: githubRepo,
+            pull_number: pr.number,
+          });
+          additions = fullPr.additions;
+          deletions = fullPr.deletions;
+          changedFiles = fullPr.changed_files;
+        } catch (detailError) {
+          console.warn(`Failed to fetch full PR details for #${pr.number}:`, detailError);
+          // Fall back to whatever the list response had (likely undefined)
+        }
+
         // Enqueue new PR
         const { error: insertError } = await supabase
           .from("pull_requests")
@@ -173,9 +195,9 @@ export async function pollRepositoryPRs(
             url: pr.html_url,
             author_github_handle: pr.user.login,
             merged_at: pr.merged_at,
-            additions_count: pr.additions,
-            deletions_count: pr.deletions,
-            files_changed_count: pr.changed_files,
+            additions_count: additions,
+            deletions_count: deletions,
+            files_changed_count: changedFiles,
           });
 
         if (insertError) {

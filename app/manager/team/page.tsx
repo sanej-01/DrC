@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
 import { ManualScanButton } from '@/components/manager/ManualScanButton';
+import { ScorePRsButton } from '@/components/manager/ScorePRsButton';
 import { authedFetch } from '@/lib/authed-fetch';
 
 interface TeamMember {
@@ -122,6 +123,16 @@ export default function ManagerTeamPage() {
       <div className="mb-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">GitHub PR Scanning</h2>
         <ManualScanButton
+          workspaceId={new URLSearchParams(
+            typeof window !== 'undefined' ? window.location.search : ''
+          ).get('workspace_id') || ''}
+        />
+      </div>
+
+      {/* Manual PR Scoring (test-only) */}
+      <div className="mb-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">PR Scoring (Manual Test)</h2>
+        <ScorePRsButton
           workspaceId={new URLSearchParams(
             typeof window !== 'undefined' ? window.location.search : ''
           ).get('workspace_id') || ''}

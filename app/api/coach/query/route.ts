@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     // Call OpenRouter API
     const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-    const OPENROUTER_BASE_URL = "https://openrouter.io/api/v1";
+    const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
     const COACH_MODEL = "openai/gpt-4"; // Use GPT-4 for coaching (higher quality)
 
     const startTime = Date.now();

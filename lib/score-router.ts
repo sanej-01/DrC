@@ -14,7 +14,7 @@
 import { buildScoringPrompt, buildTriagePrompt, validateScoringResult, ScoringResult } from "./scoring-prompt";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-const OPENROUTER_BASE_URL = "https://openrouter.io/api/v1";
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Model selection via OpenRouter
 const TRIAGE_MODEL = "openai/gpt-3.5-turbo"; // Fast, cheap triage

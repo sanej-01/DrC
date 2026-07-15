@@ -167,6 +167,8 @@ export async function pollRepositoryPRs(
           // Fall back to whatever the list response had (likely undefined)
         }
 
+        const developerId = await resolveDeveloperId(supabase, workspaceId, pr.user.login);
+
         // Enqueue new PR
         const { error: insertError } = await supabase
           .from("pull_requests")
@@ -180,6 +182,7 @@ export async function pollRepositoryPRs(
             number: pr.number,
             url: pr.html_url,
             author_github_handle: pr.user.login,
+            developer_id: developerId,
             merged_at: pr.merged_at,
             additions_count: additions,
             deletions_count: deletions,
@@ -293,6 +296,29 @@ export async function pollRepositoryPRs(
   }
 }
 
+/**
+ * Look up which developer a GitHub handle belongs to, via the
+ * durable workspace_members.github_handle mapping (set once when a
+ * developer's account is linked, not per-scan). Returns null if the
+ * handle isn't recognized in this workspace (e.g. an external
+ * contributor, or a developer who hasn't set their GitHub handle yet).
+ */
+async function resolveDeveloperId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  workspaceId: string,
+  githubHandle: string | undefined | null
+): Promise<string | null> {
+  if (!githubHandle) return null;
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", workspaceId)
+    .eq("github_handle", githubHandle)
+    .maybeSingle();
+  return data?.user_id || null;
+}
+
 const GENERAL_REVIEW_LOOKBACK_DAYS = 90;
 
 /**
@@ -390,6 +416,8 @@ async function enqueueGeneralHistoryFallback(
     const mostRecentDate =
       commits[0]?.commit.author?.date || new Date().toISOString();
 
+    const developerId = await resolveDeveloperId(supabase, workspaceId, authorHandle);
+
     const { error: insertError } = await supabase.from("pull_requests").insert({
       id: crypto.randomUUID(),
       workspace_id: workspaceId,
@@ -400,6 +428,7 @@ async function enqueueGeneralHistoryFallback(
       number: 0,
       url: `https://github.com/${githubOwner}/${githubRepo}/commits`,
       author_github_handle: authorHandle,
+      developer_id: developerId,
       merged_at: mostRecentDate,
       additions_count: 0,
       deletions_count: 0,

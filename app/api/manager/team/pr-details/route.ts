@@ -37,20 +37,36 @@ export async function GET(request: NextRequest) {
       .filter((id): id is string => !!id);
 
     let emailById = new Map<string, string>();
+    let displayNameById = new Map<string, string>();
     if (developerIds.length > 0) {
       const { data: authUsers } = await supabase.auth.admin.listUsers();
       emailById = new Map(authUsers.users.map((u) => [u.id, u.email || ""]));
+
+      const { data: members } = await supabase
+        .from("workspace_members")
+        .select("user_id, display_name")
+        .eq("workspace_id", workspaceId)
+        .not("display_name", "is", null);
+      displayNameById = new Map(
+        (members || []).map((m: { user_id: string; display_name: string }) => [
+          m.user_id,
+          m.display_name,
+        ])
+      );
     }
 
     const details = (prs || []).map((pr) => {
       const score = Array.isArray(pr.pr_scores) ? pr.pr_scores[0] : pr.pr_scores;
+      const authorDisplayName = pr.developer_id
+        ? displayNameById.get(pr.developer_id) || emailById.get(pr.developer_id) || null
+        : null;
       return {
         id: pr.id,
         number: pr.number,
         title: pr.title,
         url: pr.url,
         author_github_handle: pr.author_github_handle,
-        author_email: pr.developer_id ? emailById.get(pr.developer_id) || null : null,
+        author_display_name: authorDisplayName,
         merged_at: pr.merged_at,
         additions_count: pr.additions_count,
         deletions_count: pr.deletions_count,

@@ -210,6 +210,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Resolve the durable GitHub handle -> developer mapping (set once
+    // when a developer's account is linked, not per-webhook)
+    const { data: member } = await supabase
+      .from("workspace_members")
+      .select("user_id")
+      .eq("workspace_id", repo.workspace_id)
+      .eq("github_handle", prMetadata.author_github_handle)
+      .maybeSingle();
+
     // Insert PR into database (metadata only, no diff) - TC-ING-001
     const { data: pr, error: insertError } = await supabase
       .from("pull_requests")
@@ -223,6 +232,7 @@ export async function POST(request: NextRequest) {
         number: prMetadata.pr_number,
         url: prMetadata.url,
         author_github_handle: prMetadata.author_github_handle,
+        developer_id: member?.user_id || null,
         merged_at: prMetadata.merged_at,
         additions_count: prMetadata.additions,
         deletions_count: prMetadata.deletions,

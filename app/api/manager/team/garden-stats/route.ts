@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
     const includeZeroPR =
       request.nextUrl.searchParams.get("includeZeroPR") === "true";
 
-    // Workspace membership (role) for every member
+    // Workspace membership (role, display_name) for every member
     const { data: members, error: membersError } = await supabase
       .from("workspace_members")
-      .select("user_id, role")
+      .select("user_id, role, display_name")
       .eq("workspace_id", workspaceId);
 
     if (membersError) {
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
 
         return {
           id: member.user_id,
-          display_name: emailById.get(member.user_id) || "Unknown",
+          display_name: member.display_name || emailById.get(member.user_id) || "Unknown",
           email: emailById.get(member.user_id) || "",
           role: member.role,
           stage: getGardenStage(score_30d, confidence),

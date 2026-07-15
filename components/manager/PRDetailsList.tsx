@@ -29,7 +29,7 @@ interface PRDetail {
   title: string;
   url: string;
   author_github_handle: string;
-  author_email: string | null;
+  author_display_name: string | null;
   merged_at: string;
   additions_count: number;
   deletions_count: number;
@@ -133,7 +133,7 @@ export function PRDetailsList({ workspaceId, refreshKey }: PRDetailsListProps) {
                 #{pr.number} {pr.title}
               </a>
               <p className="text-xs text-gray-500 mt-1">
-                {pr.author_email || pr.author_github_handle} · merged{' '}
+                {pr.author_display_name || pr.author_github_handle} · merged{' '}
                 {new Date(pr.merged_at).toLocaleDateString()} · {pr.files_changed_count} files
                 {' '}(<span className="text-green-600">+{pr.additions_count}</span>{' '}
                 <span className="text-red-600">-{pr.deletions_count}</span>)

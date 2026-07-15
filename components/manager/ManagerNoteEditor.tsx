@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { authedFetch } from '@/lib/authed-fetch';
 
 interface ManagerNote {
   id: string;
@@ -59,7 +60,7 @@ export default function ManagerNoteEditor({
     const fetchNote = async () => {
       try {
         setLoading(true);
-        const response = await fetch(
+        const response = await authedFetch(
           `/api/manager/team/${developerId}/notes?workspace_id=${workspaceId}`
         );
 
@@ -95,7 +96,7 @@ export default function ManagerNoteEditor({
       setIsSaving(true);
       setError(null);
 
-      const response = await fetch(
+      const response = await authedFetch(
         `/api/manager/team/${developerId}/notes?workspace_id=${workspaceId}`,
         {
           method: 'POST',
@@ -130,7 +131,7 @@ export default function ManagerNoteEditor({
       setIsSaving(true);
       setError(null);
 
-      const response = await fetch(
+      const response = await authedFetch(
         `/api/manager/team/${developerId}/notes?workspace_id=${workspaceId}`,
         { method: 'DELETE' }
       );

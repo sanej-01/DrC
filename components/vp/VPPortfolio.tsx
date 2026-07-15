@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { authedFetch } from '@/lib/authed-fetch';
 
 interface TeamAggregate {
   id: string;
@@ -82,7 +83,7 @@ export default function VPPortfolio({ workspaceId }: VPPortfolioProps) {
     const fetchPortfolio = async () => {
       try {
         setLoading(true);
-        const response = await fetch(
+        const response = await authedFetch(
           `/api/vp/portfolio?workspaceId=${workspaceId}`
         );
 

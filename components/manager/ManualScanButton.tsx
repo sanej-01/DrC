@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { authedFetch } from '@/lib/authed-fetch';
 
 export interface ScanResult {
   workspace_id: string;
@@ -35,11 +36,10 @@ export function ManualScanButton({ workspaceId, onScanComplete }: ManualScanButt
     setShowResult(false);
 
     try {
-      const response = await fetch('/api/manager/scan-github', {
+      const response = await authedFetch('/api/manager/scan-github', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('auth_token') || '' : ''}`,
         },
         body: JSON.stringify({ workspaceId }),
       });

@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withManagerAuth } from "@/lib/api-middleware";
 
+const MIN_CONFIDENCE_THRESHOLD = 3; // Need at least 3 PRs for "CONFIDENT"
+
+interface ScoreRow {
+  code_quality: number | null;
+  bug_risk: number | null;
+  architecture: number | null;
+  test_coverage: number | null;
+}
+
 /**
  * GET /api/manager/team/garden-stats
  * Returns team member stats for garden visualization (Phase 6.1)
- * Query params: workspaceId, includeZeroPR=false
+ * Query params: workspace_id, includeZeroPR=false
  */
 export async function GET(request: NextRequest) {
-  return withManagerAuth(request, async (req, { userId, workspaceId }) => {
+  return withManagerAuth(request, async (req, { workspaceId }) => {
     const { createClient } = await import("@supabase/supabase-js");
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -17,131 +26,134 @@ export async function GET(request: NextRequest) {
     const includeZeroPR =
       request.nextUrl.searchParams.get("includeZeroPR") === "true";
 
-    // Fetch team members with their aggregates
-    const { data: team, error: teamError } = await supabase
-      .from("memberships")
-      .select(
-        `
-        user_id,
-        role,
-        users:user_id (
-          id,
-          display_name,
-          email,
-          github_handle
-        ),
-        pr_aggregates!inner (
-          developer_id,
-          avg_code_quality_30d,
-          avg_bug_risk_30d,
-          avg_architecture_30d,
-          avg_test_coverage_30d,
-          score_count_30d,
-          confidence_badge_30d
-        )
-      `
-      )
-      .eq("workspace_id", workspaceId)
-      .eq("pr_aggregates.workspace_id", workspaceId);
+    // Workspace membership (role) for every member
+    const { data: members, error: membersError } = await supabase
+      .from("workspace_members")
+      .select("user_id, role")
+      .eq("workspace_id", workspaceId);
 
-    if (teamError && teamError.code !== "PGRST116") {
-      // PGRST116 = no rows, which is OK
+    if (membersError) {
       return NextResponse.json(
         { error: "Failed to fetch team stats" },
         { status: 500 }
       );
     }
 
-    // Get members without pr_aggregates (zero PR contributors)
-    const { data: zeroScoreMembers, error: zeroError } = await supabase
-      .from("memberships")
-      .select(
-        `
-        user_id,
-        role,
-        users:user_id (
-          id,
-          display_name,
-          email,
-          github_handle
-        )
-      `
-      )
-      .eq("workspace_id", workspaceId)
-      .not("user_id", "in", `(${(team || []).map((m: any) => `'${m.user_id}'`).join(",")})`);
+    // Auth user info (email) for each member
+    const { data: authUsers, error: authError } =
+      await supabase.auth.admin.listUsers();
+    if (authError) {
+      return NextResponse.json(
+        { error: "Failed to fetch team stats" },
+        { status: 500 }
+      );
+    }
+    const emailById = new Map(authUsers.users.map((u) => [u.id, u.email]));
 
-    if (zeroError && zeroError.code !== "PGRST116") {
+    // Merged PRs (with scores) in the last 30 days for this workspace
+    const thirtyDaysAgo = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { data: prs, error: prError } = await supabase
+      .from("pull_requests")
+      .select("developer_id, merged_at, pr_scores(code_quality, bug_risk, architecture, test_coverage)")
+      .eq("workspace_id", workspaceId)
+      .gte("merged_at", thirtyDaysAgo);
+
+    if (prError) {
       return NextResponse.json(
         { error: "Failed to fetch team stats" },
         { status: 500 }
       );
     }
 
-    // Transform team data with garden stage calculation
-    const teamWithGarden = (team || []).map((member: any) => {
-      const agg = member.pr_aggregates[0];
-      const stage = getGardenStage(agg);
+    // Group scores by developer
+    const scoresByDeveloper = new Map<string, ScoreRow[]>();
+    for (const pr of prs || []) {
+      if (!pr.developer_id) continue;
+      const scores = Array.isArray(pr.pr_scores) ? pr.pr_scores : [];
+      for (const score of scores as ScoreRow[]) {
+        const existing = scoresByDeveloper.get(pr.developer_id) || [];
+        existing.push(score);
+        scoresByDeveloper.set(pr.developer_id, existing);
+      }
+    }
 
-      return {
-        id: member.user_id,
-        display_name: member.users.display_name,
-        email: member.users.email,
-        github_handle: member.users.github_handle,
-        role: member.role,
-        stage,
-        pr_count: agg.score_count_30d,
-        score_30d: calculateOverallScore(agg),
-        confidence: agg.confidence_badge_30d,
-        dimensions: {
-          quality: agg.avg_code_quality_30d,
-          bug_risk: agg.avg_bug_risk_30d,
-          architecture: agg.avg_architecture_30d,
-          tests: agg.avg_test_coverage_30d,
-        },
-      };
-    });
+    const allMembers = (members || [])
+      .map((member) => {
+        const scores = scoresByDeveloper.get(member.user_id) || [];
+        const count = scores.length;
 
-    // Add zero-PR members if includeZeroPR is true
-    const zeroMembers = includeZeroPR
-      ? (zeroScoreMembers || []).map((member: any) => ({
+        if (count === 0) {
+          return {
+            id: member.user_id,
+            display_name: emailById.get(member.user_id) || "Unknown",
+            email: emailById.get(member.user_id) || "",
+            role: member.role,
+            stage: "no_data" as const,
+            pr_count: 0,
+            score_30d: null,
+            confidence: "LOW_CONFIDENCE",
+            dimensions: {
+              quality: null,
+              bug_risk: null,
+              architecture: null,
+              tests: null,
+            },
+          };
+        }
+
+        const avg = (key: keyof ScoreRow) =>
+          Math.round(
+            (scores.reduce((sum, s) => sum + (s[key] || 0), 0) / count) * 100
+          ) / 100;
+
+        const dims = {
+          quality: avg("code_quality"),
+          bug_risk: avg("bug_risk"),
+          architecture: avg("architecture"),
+          tests: avg("test_coverage"),
+        };
+
+        const score_30d = Math.round(
+          (dims.quality + (100 - dims.bug_risk) + dims.architecture + dims.tests) / 4
+        );
+
+        const confidence =
+          count >= MIN_CONFIDENCE_THRESHOLD ? "CONFIDENT" : "LOW_CONFIDENCE";
+
+        return {
           id: member.user_id,
-          display_name: member.users.display_name,
-          email: member.users.email,
-          github_handle: member.users.github_handle,
+          display_name: emailById.get(member.user_id) || "Unknown",
+          email: emailById.get(member.user_id) || "",
           role: member.role,
-          stage: "no_data",
-          pr_count: 0,
-          score_30d: null,
-          confidence: "NO_DATA",
-          dimensions: {
-            quality: null,
-            bug_risk: null,
-            architecture: null,
-            tests: null,
-          },
-        }))
-      : [];
+          stage: getGardenStage(score_30d, confidence),
+          pr_count: count,
+          score_30d,
+          confidence,
+          dimensions: dims,
+        };
+      })
+      .filter((m) => includeZeroPR || m.pr_count > 0);
 
-    const allMembers = [...teamWithGarden, ...zeroMembers];
+    const membersWithData = allMembers.filter((m) => m.pr_count > 0);
 
-    // Calculate workspace stats
     const stats = {
       total_members: allMembers.length,
-      members_with_data: teamWithGarden.length,
-      members_no_data: zeroMembers.length,
+      members_with_data: membersWithData.length,
+      members_no_data: allMembers.length - membersWithData.length,
       stage_breakdown: {
-        flourishing: allMembers.filter((m: any) => m.stage === "flourishing").length,
-        mature: allMembers.filter((m: any) => m.stage === "mature").length,
-        sapling: allMembers.filter((m: any) => m.stage === "sapling").length,
-        seedling: allMembers.filter((m: any) => m.stage === "seedling").length,
-        no_data: allMembers.filter((m: any) => m.stage === "no_data").length,
+        flourishing: allMembers.filter((m) => m.stage === "flourishing").length,
+        mature: allMembers.filter((m) => m.stage === "mature").length,
+        sapling: allMembers.filter((m) => m.stage === "sapling").length,
+        seedling: allMembers.filter((m) => m.stage === "seedling").length,
+        no_data: allMembers.filter((m) => m.stage === "no_data").length,
       },
       avg_score_30d:
-        teamWithGarden.length > 0
-          ? teamWithGarden.reduce(
-              (sum: number, m: any) => sum + (m.score_30d || 0),
-              0
-            ) / teamWithGarden.length
+        membersWithData.length > 0
+          ? membersWithData.reduce((sum, m) => sum + (m.score_30d || 0), 0) /
+            membersWithData.length
           : null,
     };
 
@@ -156,25 +168,13 @@ export async function GET(request: NextRequest) {
  * - sapling: 40-69 score
  * - seedling: <40 or low confidence (<3 PRs)
  */
-function getGardenStage(agg: any): string {
-  if (!agg || agg.score_count_30d === 0) return "no_data";
-  if (agg.confidence_badge_30d === "LOW_CONFIDENCE") return "seedling";
-
-  const score = calculateOverallScore(agg);
+function getGardenStage(
+  score: number,
+  confidence: string
+): "flourishing" | "mature" | "sapling" | "seedling" | "no_data" {
+  if (confidence === "LOW_CONFIDENCE") return "seedling";
   if (score >= 85) return "flourishing";
   if (score >= 70) return "mature";
   if (score >= 40) return "sapling";
   return "seedling";
-}
-
-/**
- * Calculate overall score from 4 dimensions
- * Overall = (quality + (100-risk) + architecture + tests) / 4
- */
-function calculateOverallScore(agg: any): number {
-  const quality = agg.avg_code_quality_30d || 0;
-  const riskInverted = 100 - (agg.avg_bug_risk_30d || 0);
-  const architecture = agg.avg_architecture_30d || 0;
-  const tests = agg.avg_test_coverage_30d || 0;
-  return Math.round((quality + riskInverted + architecture + tests) / 4);
 }

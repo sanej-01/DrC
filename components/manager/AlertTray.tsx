@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { authedFetch } from '@/lib/authed-fetch';
 
 interface Alert {
   id: string;
@@ -64,7 +65,7 @@ export default function AlertTray({ workspaceId }: AlertTrayProps) {
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const response = await fetch(`/api/manager/alerts?workspace_id=${workspaceId}`);
+        const response = await authedFetch(`/api/manager/alerts?workspace_id=${workspaceId}`);
         if (response.ok) {
           const data = await response.json();
           setAlerts(data.alerts || []);
@@ -97,7 +98,7 @@ export default function AlertTray({ workspaceId }: AlertTrayProps) {
   const handleSnooze = async (alertId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/manager/alerts`, {
+      const response = await authedFetch(`/api/manager/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -120,7 +121,7 @@ export default function AlertTray({ workspaceId }: AlertTrayProps) {
   const handleDismiss = async (alertId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/manager/alerts`, {
+      const response = await authedFetch(`/api/manager/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

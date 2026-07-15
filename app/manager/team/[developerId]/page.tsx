@@ -11,6 +11,7 @@ import DeveloperTrajectory from '@/components/manager/DeveloperTrajectory';
 import PRHeatMap from '@/components/manager/PRHeatMap';
 import CoachingHistory from '@/components/manager/CoachingHistory';
 import ManagerNoteEditor from '@/components/manager/ManagerNoteEditor';
+import { authedFetch } from '@/lib/authed-fetch';
 
 interface Developer {
   id: string;
@@ -86,7 +87,7 @@ export default function IndividualDeveloperPage() {
 
         setWorkspaceId(wid);
 
-        const response = await fetch(
+        const response = await authedFetch(
           `/api/manager/team/${developerId}/individual-stats?workspace_id=${wid}`
         );
 

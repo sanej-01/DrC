@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
 import { ManualScanButton } from '@/components/manager/ManualScanButton';
+import { authedFetch } from '@/lib/authed-fetch';
 
 interface TeamMember {
   id: string;
@@ -64,7 +65,7 @@ export default function ManagerTeamPage() {
         params.set('workspace_id', workspaceId);
         params.set('includeZeroPR', includeZeroPR.toString());
 
-        const response = await fetch(`/api/manager/team/garden-stats?${params}`);
+        const response = await authedFetch(`/api/manager/team/garden-stats?${params}`);
 
         if (!response.ok) {
           const data = await response.json();

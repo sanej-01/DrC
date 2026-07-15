@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { authedFetch } from '@/lib/authed-fetch';
 
 interface CoachMessage {
   id: string;
@@ -41,7 +42,7 @@ export default function CoachPanel({
     const fetchHistory = async () => {
       try {
         setHistoryLoading(true);
-        const response = await fetch(
+        const response = await authedFetch(
           `/api/coach/query?workspaceId=${workspaceId}&developerId=${developerId}`
         );
 
@@ -85,7 +86,7 @@ export default function CoachPanel({
     setInput('');
 
     try {
-      const response = await fetch('/api/coach/query', {
+      const response = await authedFetch('/api/coach/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { authedFetch } from "@/lib/authed-fetch";
 
 /**
  * /auth/invite?token=XXX
@@ -82,12 +83,10 @@ function InvitePageInner() {
       setIsAccepting(true);
       setError(null);
 
-      // Get auth token from browser
-      const response = await fetch("/api/auth/invites/accept", {
+      const response = await authedFetch("/api/auth/invites/accept", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("supabase.auth.token")}`,
         },
         body: JSON.stringify({ token }),
       });

@@ -29,11 +29,11 @@ export default function SignInPage() {
 
   return (
     <div
-      className="flex items-center justify-center min-h-screen"
+      className="flex items-center justify-center min-h-screen px-4 py-12 sm:px-6"
       style={{ background: "var(--bg)" }}
     >
       <div
-        className="w-full max-w-md rounded-lg border p-8"
+        className="w-full max-w-md rounded-xl border p-8 sm:p-10"
         style={{
           background: "var(--surface)",
           borderColor: "var(--line)",
@@ -41,7 +41,7 @@ export default function SignInPage() {
         }}
       >
         {/* Logo */}
-        <div className="mb-8 flex items-center justify-center gap-2">
+        <div className="mb-10 flex items-center justify-center gap-3">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm text-white"
             style={{ background: "var(--sage)" }}
@@ -52,11 +52,11 @@ export default function SignInPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium mb-1"
+              className="block text-sm font-medium mb-1.5"
               style={{ color: "var(--ink)" }}
             >
               Email
@@ -67,7 +67,7 @@ export default function SignInPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border text-sm"
+              className="w-full px-3.5 py-2.5 rounded-lg border text-sm"
               style={{
                 borderColor: "var(--line)",
                 background: "var(--surface-2)",
@@ -79,7 +79,7 @@ export default function SignInPage() {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium mb-1"
+              className="block text-sm font-medium mb-1.5"
               style={{ color: "var(--ink)" }}
             >
               Password
@@ -90,7 +90,7 @@ export default function SignInPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border text-sm"
+              className="w-full px-3.5 py-2.5 rounded-lg border text-sm"
               style={{
                 borderColor: "var(--line)",
                 background: "var(--surface-2)",
@@ -114,17 +114,12 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 rounded-lg font-medium text-sm text-white transition-all disabled:opacity-50"
+            className="w-full py-2.5 px-4 rounded-lg font-medium text-sm text-white transition-all disabled:opacity-50"
             style={{ background: "var(--sage)" }}
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        {/* Demo link */}
-        <div className="mt-6 text-center text-xs" style={{ color: "var(--ink-3)" }}>
-          <p>Demo credentials available in docs</p>
-        </div>
       </div>
     </div>
   );

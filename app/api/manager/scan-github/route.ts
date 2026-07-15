@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     // Get auth context (user_id from session)
     const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -34,7 +34,18 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // Verify manager has access to workspace (RLS check)
+    // Verify the calling user's identity from the bearer token
+    const token = authHeader.slice(7);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    // Verify workspace exists
     const { data: workspace, error: wsError } = await supabase
       .from("workspaces")
       .select("id")
@@ -48,11 +59,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user is manager or admin of workspace
+    // Verify the calling user is manager or admin of this workspace
     const { data: member, error: memberError } = await supabase
       .from("workspace_members")
       .select("role")
       .eq("workspace_id", workspaceId)
+      .eq("user_id", user.id)
       .maybeSingle();
 
     if (memberError || !member || !["manager", "admin"].includes(member.role)) {

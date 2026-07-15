@@ -30,7 +30,7 @@ export async function withAuth(
     const {
       data: { user },
       error,
-    } = await supabase.auth.admin.getUserById(token);
+    } = await supabase.auth.getUser(token);
 
     if (error || !user) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -38,17 +38,19 @@ export async function withAuth(
 
     // Get workspace ID from query params or body
     const workspaceId =
-      request.nextUrl.searchParams.get("workspaceId") || "";
+      request.nextUrl.searchParams.get("workspace_id") ||
+      request.nextUrl.searchParams.get("workspaceId") ||
+      "";
     if (!workspaceId) {
       return NextResponse.json(
-        { error: "workspaceId required" },
+        { error: "workspace_id required" },
         { status: 400 }
       );
     }
 
     // Get user's role in workspace
     const { data: membership, error: memberError } = await supabase
-      .from("memberships")
+      .from("workspace_members")
       .select("role")
       .eq("user_id", user.id)
       .eq("workspace_id", workspaceId)

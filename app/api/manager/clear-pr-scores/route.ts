@@ -6,11 +6,11 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 /**
  * POST /api/manager/clear-pr-scores
- * Manual test-only utility: deletes all pr_scores rows for the
- * workspace's pull requests, so "Score PRs Now" treats them as
- * unscored again. Lets you re-test the scoring pipeline (including
- * the LLM analysis) on PRs that already have a score, without having
- * to re-scan or manually touch the database.
+ * Manual test-only utility: deletes all pr_scores AND pull_requests
+ * rows for the workspace, so both "Scan GitHub Now" and "Score PRs
+ * Now" start from a clean slate - the scanner will rediscover every
+ * PR (and re-evaluate the no-PR-history fallback) instead of treating
+ * previously-seen PRs as duplicates to skip.
  *
  * Body: { workspaceId }
  */
@@ -54,15 +54,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: deleted, error: deleteError } = await supabase
+    // Delete scores first (don't rely on ON DELETE CASCADE being
+    // configured), then the PRs themselves.
+    const { data: deletedScores, error: scoresError } = await supabase
       .from("pr_scores")
       .delete()
       .eq("workspace_id", workspaceId)
       .select("id");
 
-    if (deleteError) {
+    if (scoresError) {
       return NextResponse.json(
-        { error: "Failed to clear PR scores", details: deleteError.message },
+        { error: "Failed to clear PR scores", details: scoresError.message },
+        { status: 500 }
+      );
+    }
+
+    const { data: deletedPrs, error: prsError } = await supabase
+      .from("pull_requests")
+      .delete()
+      .eq("workspace_id", workspaceId)
+      .select("id");
+
+    if (prsError) {
+      return NextResponse.json(
+        { error: "Failed to clear PR history", details: prsError.message },
         { status: 500 }
       );
     }
@@ -70,7 +85,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       workspace_id: workspaceId,
       timestamp: new Date().toISOString(),
-      scores_cleared: deleted?.length || 0,
+      scores_cleared: deletedScores?.length || 0,
+      prs_cleared: deletedPrs?.length || 0,
     });
   } catch (error) {
     console.error("Clear PR scores error:", error);

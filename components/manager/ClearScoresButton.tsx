@@ -13,7 +13,11 @@ export function ClearScoresButton({ workspaceId, onCleared }: ClearScoresButtonP
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
   const handleClear = async () => {
-    if (!confirm('Clear all PR scores for this workspace? This lets you re-test scoring from scratch, including the last scanned PR.')) {
+    if (
+      !confirm(
+        'Clear all PR scores AND PR history for this workspace? This deletes the pull_requests rows too, so the next scan rediscovers everything from scratch (including re-evaluating the no-PR-history fallback). This cannot be undone.'
+      )
+    ) {
       return;
     }
 
@@ -34,7 +38,7 @@ export function ClearScoresButton({ workspaceId, onCleared }: ClearScoresButtonP
       }
 
       setMessage({
-        text: `Cleared ${data.scores_cleared} score${data.scores_cleared === 1 ? '' : 's'}`,
+        text: `Cleared ${data.scores_cleared} score${data.scores_cleared === 1 ? '' : 's'} and ${data.prs_cleared} PR${data.prs_cleared === 1 ? '' : 's'}`,
         isError: false,
       });
       onCleared?.();
@@ -65,7 +69,7 @@ export function ClearScoresButton({ workspaceId, onCleared }: ClearScoresButtonP
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            Clear PR Scores
+            Clear PR Scores & History
           </>
         )}
       </button>

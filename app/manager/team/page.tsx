@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
 import { ManualScanButton } from '@/components/manager/ManualScanButton';
 import { ScorePRsButton } from '@/components/manager/ScorePRsButton';
+import { PRDetailsList } from '@/components/manager/PRDetailsList';
 import { authedFetch } from '@/lib/authed-fetch';
 
 interface TeamMember {
@@ -45,6 +46,7 @@ export default function ManagerTeamPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [includeZeroPR, setIncludeZeroPR] = useState(false);
+  const [prDetailsRefreshKey, setPrDetailsRefreshKey] = useState(0);
 
   useEffect(() => {
     const fetchTeamStats = async () => {
@@ -126,6 +128,7 @@ export default function ManagerTeamPage() {
           workspaceId={new URLSearchParams(
             typeof window !== 'undefined' ? window.location.search : ''
           ).get('workspace_id') || ''}
+          onScanComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
         />
       </div>
 
@@ -136,6 +139,7 @@ export default function ManagerTeamPage() {
           workspaceId={new URLSearchParams(
             typeof window !== 'undefined' ? window.location.search : ''
           ).get('workspace_id') || ''}
+          onScoreComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
         />
       </div>
 
@@ -165,6 +169,17 @@ export default function ManagerTeamPage() {
           </p>
         </div>
       )}
+
+      {/* PR Details + LLM Analysis */}
+      <div className="mt-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">PR Details</h2>
+        <PRDetailsList
+          workspaceId={new URLSearchParams(
+            typeof window !== 'undefined' ? window.location.search : ''
+          ).get('workspace_id') || ''}
+          refreshKey={prDetailsRefreshKey}
+        />
+      </div>
     </div>
   );
 }

@@ -91,14 +91,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Already-scored PR ids, so re-running this skips them instead of
-    // erroring or double-scoring
+    // erroring or double-scoring. A row with scores but no
+    // overall_assessment predates the overall_assessment/feedback
+    // columns being added - delete and re-score it so it gets the
+    // full analysis instead of leaving it permanently incomplete.
     const { data: existingScores } = await supabase
       .from("pr_scores")
-      .select("pull_request_id")
+      .select("id, pull_request_id, overall_assessment")
       .in("pull_request_id", prs.map((pr) => pr.id));
 
-    const alreadyScored = new Set((existingScores || []).map((s) => s.pull_request_id));
-    const toScore = prs.filter((pr) => !alreadyScored.has(pr.id));
+    const incompleteScoreIds = (existingScores || [])
+      .filter((s) => !s.overall_assessment)
+      .map((s) => s.id);
+
+    if (incompleteScoreIds.length > 0) {
+      await supabase.from("pr_scores").delete().in("id", incompleteScoreIds);
+    }
+
+    const fullyScored = new Set(
+      (existingScores || []).filter((s) => s.overall_assessment).map((s) => s.pull_request_id)
+    );
+    const toScore = prs.filter((pr) => !fullyScored.has(pr.id));
 
     const octokit = new Octokit({ auth: tokenRecord.access_token });
     const errors: string[] = [];
@@ -159,6 +172,8 @@ export async function POST(request: NextRequest) {
           architecture: result.architecture,
           test_coverage: result.test_coverage,
           overall_score: overallScore,
+          overall_assessment: result.overall_assessment,
+          feedback: result.feedback,
           scored_at: new Date().toISOString(),
         });
 
@@ -178,7 +193,7 @@ export async function POST(request: NextRequest) {
       workspace_id: workspaceId,
       timestamp: new Date().toISOString(),
       prs_checked: prs.length,
-      prs_already_scored: alreadyScored.size,
+      prs_already_scored: fullyScored.size,
       prs_scored: scored,
       errors,
     });

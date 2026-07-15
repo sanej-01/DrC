@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
+import { ManualScanButton } from '@/components/manager/ManualScanButton';
 
 interface TeamMember {
   id: string;
@@ -114,6 +115,16 @@ export default function ManagerTeamPage() {
         <p className="text-gray-600">
           Watch your team grow. Each member is shown as a plant, representing their growth stage based on 30-day development metrics.
         </p>
+      </div>
+
+      {/* Manual GitHub Scan */}
+      <div className="mb-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">GitHub PR Scanning</h2>
+        <ManualScanButton
+          workspaceId={new URLSearchParams(
+            typeof window !== 'undefined' ? window.location.search : ''
+          ).get('workspace_id') || ''}
+        />
       </div>
 
       {/* Toggle for zero-PR members */}

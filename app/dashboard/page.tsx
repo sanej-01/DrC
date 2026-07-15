@@ -212,10 +212,10 @@ export default function DashboardPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Four Dimensions</h2>
         <DimensionTiles
           stats={{
-            code_quality: stats?.avg_code_quality,
-            bug_risk: stats?.avg_bug_risk,
-            architecture: stats?.avg_architecture,
-            test_coverage: stats?.avg_test_coverage,
+            code_quality: stats?.avg_code_quality ?? null,
+            bug_risk: stats?.avg_bug_risk ?? null,
+            architecture: stats?.avg_architecture ?? null,
+            test_coverage: stats?.avg_test_coverage ?? null,
           }}
           confidence={stats?.confidence_badge}
         />

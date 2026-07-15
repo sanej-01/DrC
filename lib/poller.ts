@@ -120,6 +120,22 @@ export async function pollRepositoryPRs(
 
     result.prs_checked = prs.length;
 
+    // No PR history at all for this repo - fall back to a general
+    // commit-history-based review so there's still something to score
+    // and show in PR Details, instead of the scan just reporting 0
+    // forever for repos that never used GitHub's PR feature.
+    if (prs.length === 0) {
+      await enqueueGeneralHistoryFallback(
+        supabase,
+        octokit,
+        workspaceId,
+        repoId,
+        githubOwner,
+        githubRepo,
+        result
+      );
+    }
+
     // Check for duplicates and enqueue new PRs
     for (const pr of prs) {
       try {
@@ -250,6 +266,120 @@ export async function pollRepositoryPRs(
 
     result.error = errorMessage;
     return result;
+  }
+}
+
+const GENERAL_REVIEW_LOOKBACK_DAYS = 90;
+
+/**
+ * Fallback for repos with zero merged PRs (e.g. everything was pushed
+ * directly to main, or merged without going through GitHub's PR
+ * feature). Instead of the scan reporting 0 PRs forever, summarize the
+ * last ~90 days of commit activity as one synthetic pull_requests row
+ * so there's still something for score-prs to analyze and for the PR
+ * Details section to display.
+ *
+ * Idempotent the same way real PRs are: pr_node_id is a stable string
+ * derived from the repo (not random), so re-scanning finds the
+ * existing row via the normal duplicate check and skips it, rather
+ * than creating a new one every time.
+ */
+async function enqueueGeneralHistoryFallback(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  octokit: Octokit,
+  workspaceId: string,
+  repoId: string,
+  githubOwner: string,
+  githubRepo: string,
+  result: PollerResult
+): Promise<void> {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - GENERAL_REVIEW_LOOKBACK_DAYS);
+
+    const { data: commits } = await octokit.rest.repos.listCommits({
+      owner: githubOwner,
+      repo: githubRepo,
+      since: since.toISOString(),
+      per_page: 100,
+    });
+
+    if (!commits || commits.length === 0) {
+      return; // Nothing pushed in the lookback window either
+    }
+
+    const pr_node_id = `general-review:${githubOwner}/${githubRepo}`;
+
+    const { data: existing, error: checkError } = await supabase
+      .from("pull_requests")
+      .select("id")
+      .eq("pr_node_id", pr_node_id)
+      .single();
+
+    if (checkError && checkError.code !== "PGRST116") {
+      result.error = extractErrorMessage(checkError);
+      return;
+    }
+
+    if (existing) {
+      result.prs_duplicated++;
+      return;
+    }
+
+    // Most frequent committer, or a generic label if activity is spread
+    // across several people
+    const authorCounts = new Map<string, number>();
+    for (const commit of commits) {
+      const author = commit.author?.login || commit.commit.author?.name || "unknown";
+      authorCounts.set(author, (authorCounts.get(author) || 0) + 1);
+    }
+    const sortedAuthors = [...authorCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const authorHandle =
+      sortedAuthors.length > 0 && sortedAuthors[0][1] >= commits.length / 2
+        ? sortedAuthors[0][0]
+        : "multiple-contributors";
+
+    const mostRecentDate =
+      commits[0]?.commit.author?.date || new Date().toISOString();
+
+    const { error: insertError } = await supabase.from("pull_requests").insert({
+      id: crypto.randomUUID(),
+      workspace_id: workspaceId,
+      repo_id: repoId,
+      github_pr_id: 0,
+      pr_node_id,
+      title: `No PR history — general review of ${commits.length} commit${commits.length === 1 ? "" : "s"} from the last ${GENERAL_REVIEW_LOOKBACK_DAYS} days`,
+      number: 0,
+      url: `https://github.com/${githubOwner}/${githubRepo}/commits`,
+      author_github_handle: authorHandle,
+      merged_at: mostRecentDate,
+      additions_count: 0,
+      deletions_count: 0,
+      files_changed_count: 0,
+    });
+
+    if (insertError) {
+      result.error = extractErrorMessage(insertError);
+      return;
+    }
+
+    result.prs_enqueued++;
+    result.prs_checked++;
+
+    await supabase.from("audit_log").insert({
+      workspace_id: workspaceId,
+      action: "general_review_enqueued",
+      subject_type: "pr",
+      subject_id: pr_node_id,
+      details: {
+        commit_count: commits.length,
+        lookback_days: GENERAL_REVIEW_LOOKBACK_DAYS,
+        source: "poller",
+      },
+    });
+  } catch (fallbackError) {
+    result.error = extractErrorMessage(fallbackError);
   }
 }
 

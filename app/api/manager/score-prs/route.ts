@@ -6,6 +6,100 @@ import { routeAndScorePR } from "@/lib/score-router";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
+const GENERAL_REVIEW_MAX_FILES = 20;
+const GENERAL_REVIEW_MAX_BYTES = 60_000;
+
+// Config/secret/build-output files a general code-quality review has no
+// business reading, even though they'd technically be "source" in the repo.
+const EXCLUDED_PATH_PATTERNS = [
+  /(^|\/)node_modules\//,
+  /(^|\/)dist\//,
+  /(^|\/)build\//,
+  /(^|\/)\.git\//,
+  /(^|\/)coverage\//,
+  /(^|\/)\.next\//,
+  /(^|\/)\.vercel\//,
+];
+const EXCLUDED_FILENAME_PATTERNS = [
+  /^\.env/i,
+  /\.lock$/i,
+  /^package-lock\.json$/i,
+  /^yarn\.lock$/i,
+  /^pnpm-lock\.yaml$/i,
+  /^\.gitignore$/i,
+  /^\.gitmodules$/i,
+  /\.map$/i,
+  /\.min\.(js|css)$/i,
+];
+const INCLUDED_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".sql", ".md"];
+
+function isAnalyzableSourceFile(path: string): boolean {
+  if (EXCLUDED_PATH_PATTERNS.some((p) => p.test(path))) return false;
+  const filename = path.split("/").pop() || "";
+  if (EXCLUDED_FILENAME_PATTERNS.some((p) => p.test(filename))) return false;
+  return INCLUDED_EXTENSIONS.some((ext) => path.endsWith(ext));
+}
+
+/**
+ * Build a pseudo-diff by concatenating a capped selection of the repo's
+ * current source files, for the "no PR history" fallback where there's
+ * no real diff to score. Reuses the same scoring prompt/rubric as a
+ * normal PR review - the LLM just sees file snapshots instead of a diff.
+ */
+async function buildGeneralReviewContent(
+  octokit: Octokit,
+  owner: string,
+  repo: string
+): Promise<{ content: string; fileCount: number }> {
+  const { data: repoInfo } = await octokit.rest.repos.get({ owner, repo });
+  const { data: branch } = await octokit.rest.repos.getBranch({
+    owner,
+    repo,
+    branch: repoInfo.default_branch,
+  });
+
+  const { data: tree } = await octokit.rest.git.getTree({
+    owner,
+    repo,
+    tree_sha: branch.commit.sha,
+    recursive: "true",
+  });
+
+  const candidates = (tree.tree || []).filter(
+    (entry) => entry.type === "blob" && entry.path && isAnalyzableSourceFile(entry.path)
+  );
+
+  let totalBytes = 0;
+  const sections: string[] = [];
+  let fileCount = 0;
+
+  for (const entry of candidates) {
+    if (fileCount >= GENERAL_REVIEW_MAX_FILES || totalBytes >= GENERAL_REVIEW_MAX_BYTES) break;
+    if (!entry.path || !entry.sha) continue;
+
+    try {
+      const { data: blob } = await octokit.rest.git.getBlob({
+        owner,
+        repo,
+        file_sha: entry.sha,
+      });
+      if (blob.encoding !== "base64") continue;
+
+      const decoded = Buffer.from(blob.content, "base64").toString("utf-8");
+      const remaining = GENERAL_REVIEW_MAX_BYTES - totalBytes;
+      const truncated = decoded.length > remaining ? decoded.slice(0, remaining) : decoded;
+
+      sections.push(`--- FILE: ${entry.path} ---\n${truncated}`);
+      totalBytes += truncated.length;
+      fileCount++;
+    } catch (blobError) {
+      console.warn(`Failed to fetch blob for ${entry.path}:`, blobError);
+    }
+  }
+
+  return { content: sections.join("\n\n"), fileCount };
+}
+
 /**
  * POST /api/manager/score-prs
  * Manual test-only trigger: score every pull_requests row in the
@@ -130,25 +224,40 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        const isGeneralReview = pr.pr_node_id?.startsWith("general-review:");
         let diff = "";
-        try {
-          const { data } = await octokit.rest.pulls.get({
-            owner: repo.owner,
-            repo: repo.name,
-            pull_number: pr.number,
-            mediaType: { format: "diff" },
-          });
-          diff = data as unknown as string;
-        } catch (diffError) {
-          console.warn(`Failed to fetch diff for PR #${pr.number}:`, diffError);
-          // Continue with empty diff rather than failing the whole PR
+        let filesChangedCount = pr.files_changed_count || 0;
+
+        if (isGeneralReview) {
+          // No PR/diff exists - review a snapshot of the current source
+          // instead (env/config/lockfiles/build output excluded).
+          const { content, fileCount } = await buildGeneralReviewContent(
+            octokit,
+            repo.owner,
+            repo.name
+          );
+          diff = content;
+          filesChangedCount = fileCount;
+        } else {
+          try {
+            const { data } = await octokit.rest.pulls.get({
+              owner: repo.owner,
+              repo: repo.name,
+              pull_number: pr.number,
+              mediaType: { format: "diff" },
+            });
+            diff = data as unknown as string;
+          } catch (diffError) {
+            console.warn(`Failed to fetch diff for PR #${pr.number}:`, diffError);
+            // Continue with empty diff rather than failing the whole PR
+          }
         }
 
         const { result } = await routeAndScorePR(
           pr.number,
           pr.title,
           pr.author_github_handle,
-          pr.files_changed_count || 0,
+          filesChangedCount,
           pr.additions_count || 0,
           pr.deletions_count || 0,
           diff

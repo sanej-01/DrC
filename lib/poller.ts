@@ -324,9 +324,13 @@ export async function pollWorkspacePRs(
     // Poll each repo
     const results: PollerResult[] = [];
     for (const repo of repos) {
+      // pull_requests.repo_id, poller_metadata.repo_id, and
+      // poller_job_log.repo_id all have foreign keys to repos(id) -
+      // not repos.repo_id, which is a separate, unrelated GitHub-side
+      // identifier column with no FK relationships anywhere.
       const result = await pollRepositoryPRs(
         workspaceId,
-        repo.repo_id,
+        repo.id,
         repo.owner,
         repo.name,
         userGitHubToken

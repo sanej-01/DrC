@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
     // Find workspace by repo
     const { data: repo } = await supabase
       .from("repos")
-      .select("workspace_id, repo_id")
+      .select("id, workspace_id")
       .eq("full_name", `${prMetadata.repo_owner}/${prMetadata.repo_name}`)
       .single();
 
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id: crypto.randomUUID(),
         workspace_id: repo.workspace_id,
-        repo_id: repo.repo_id,
+        repo_id: repo.id,
         github_pr_id: prMetadata.github_pr_id,
         pr_node_id: prMetadata.pr_node_id,
         title: prMetadata.title,

@@ -6,16 +6,20 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 /**
- * GET /api/cron/poll-github
- * Vercel Cron job triggered every 5 minutes
+ * POST /api/cron/poll-github
+ * Manual GitHub polling endpoint (no automatic scheduling)
  * Phase 3.5: Polls GitHub for missed webhooks (fallback ingestion)
  *
- * Security: Requires CRON_SECRET env var (set by Vercel)
- * Authorization: Vercel passes Authorization: Bearer <cron_secret> header
+ * MANUAL ONLY: No automatic cron scheduling
+ * Trigger manually via curl or admin dashboard
+ *
+ * Security: Requires CRON_SECRET in Authorization header
+ * Usage: POST /api/cron/poll-github
+ *        Header: Authorization: Bearer <CRON_SECRET>
  *
  * TC-ING-003 (poller part): Missed webhook recovered, dedup-safe
  */
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     // Verify Vercel Cron secret
     const cronSecret = process.env.CRON_SECRET;

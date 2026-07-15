@@ -10,9 +10,9 @@ Dr. Codium is deployed to Vercel with:
 - **Frontend**: Next.js React App Router
 - **Backend**: Next.js API routes
 - **Database**: Supabase (PostgreSQL + RLS)
-- **Webhooks**: GitHub App (PR events)
-- **LLM**: Anthropic Claude Opus API
-- **Cron Jobs**: Vercel Cron (GitHub PR poller)
+- **Webhooks**: GitHub App (PR events - automatic)
+- **LLM**: OpenRouter (multiple LLM providers)
+- **Manual Polling**: GitHub PR poller (on-demand only, no automatic cron)
 
 ---
 
@@ -140,9 +140,9 @@ GITHUB_OAUTH_CLIENT_SECRET=<from GitHub OAuth App>
 GITHUB_OAUTH_REDIRECT_URI=https://<vercel-domain>/api/auth/github/callback
 ```
 
-### Anthropic (LLM)
+### OpenRouter (LLM)
 ```bash
-ANTHROPIC_API_KEY=<from Anthropic Console>
+OPENROUTER_API_KEY=<from OpenRouter https://openrouter.io/keys>
 ```
 
 ### Cost Controls
@@ -201,27 +201,37 @@ vercel env add GITHUB_APP_ID
 
 ---
 
-### 3. Configure Cron Jobs
+### 3. Manual GitHub Polling Configuration
 
-**Vercel automatically reads `vercel.json`**:
+**No automatic cron scheduling** (manual-only):
 
 ```json
 {
-  "crons": [
-    {
-      "path": "/api/cron/poll-github",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "crons": []
 }
 ```
 
-**Cron Job Details**:
+**Manual Polling Details**:
 - **Path**: `/api/cron/poll-github` (implemented in `app/api/cron/poll-github/route.ts`)
-- **Schedule**: Every 5 minutes (fallback PR polling)
-- **Timeout**: 60 seconds (Vercel limit for cron)
-- **Verification**: Sends `Authorization: Bearer <CRON_SECRET>` header
-- **Purpose**: Polls for merged PRs that may have missed webhook delivery
+- **Schedule**: None (manual trigger only)
+- **Method**: POST (requires manual API call)
+- **Verification**: Requires `Authorization: Bearer <CRON_SECRET>` header
+- **Purpose**: On-demand fallback for merged PRs that may have missed webhook delivery
+
+**Trigger Manual Scan**:
+```bash
+curl -X POST https://<vercel-domain>/api/cron/poll-github \
+  -H "Authorization: Bearer <CRON_SECRET>" \
+  -H "Content-Type: application/json"
+```
+
+**When to Trigger**:
+- Weekly maintenance (insurance against missed webhooks)
+- After GitHub App re-installation
+- If PR scoring seems stalled
+- After extended service outage
+
+See [MANUAL_SCANNING.md](MANUAL_SCANNING.md) for complete guide.
 
 ---
 

@@ -1,57 +1,62 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import Topbar from "@/components/Topbar";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Redirect to sign-in if not authenticated
     if (!loading && !user) {
       router.push("/auth/sign-in");
+      return;
     }
+
+    if (!user) return;
+
+    // Look up the user's workspace membership and route to the
+    // dashboard for their role
+    const redirectToDashboard = async () => {
+      const { data: membership, error: memberError } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, role")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        setError("No workspace membership found for your account.");
+        return;
+      }
+
+      const { workspace_id, role } = membership;
+
+      if (role === "manager" || role === "admin") {
+        router.push(`/manager/team?workspace_id=${workspace_id}`);
+      } else {
+        router.push(`/dashboard?workspace_id=${workspace_id}`);
+      }
+    };
+
+    redirectToDashboard();
   }, [user, loading, router]);
 
-  if (loading) {
+  if (error) {
     return (
       <div
         className="flex items-center justify-center h-screen"
         style={{ background: "var(--bg)" }}
       >
-        <div style={{ color: "var(--ink-2)" }}>Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  return (
-    <div className="flex flex-col h-screen">
-      <Topbar />
-      <main
-        className="flex flex-1 overflow-hidden"
-        style={{
-          background: "var(--bg)",
-        }}
-      >
-        {/* Placeholder for main content */}
-        <div
-          className="flex-1 flex flex-col items-center justify-center p-8"
-          style={{
-            color: "var(--ink-2)",
-          }}
-        >
-          <h1 className="text-2xl font-semibold mb-2">Dr Codium</h1>
-          <p className="text-sm mb-6">Phase 2.1 auth — signed in as {user.email}</p>
+        <div className="text-center">
+          <p style={{ color: "var(--ink-2)" }}>{error}</p>
           <button
             onClick={() => router.push("/auth/sign-out")}
-            className="px-4 py-2 rounded-lg text-sm font-medium"
+            className="mt-4 px-4 py-2 rounded-lg text-sm font-medium"
             style={{
               background: "var(--surface)",
               border: "1px solid var(--line)",
@@ -61,7 +66,16 @@ export default function Home() {
             Sign out
           </button>
         </div>
-      </main>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center justify-center h-screen"
+      style={{ background: "var(--bg)" }}
+    >
+      <div style={{ color: "var(--ink-2)" }}>Loading...</div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { withManagerAuth } from "@/lib/api-middleware";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { developerId: string } }
+  { params }: { params: Promise<{ developerId: string }> }
 ) {
   return withManagerAuth(request, async (req, { userId, workspaceId }) => {
     const { createClient } = await import("@supabase/supabase-js");
@@ -17,7 +17,7 @@ export async function GET(
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
 
-    const developerId = params.developerId;
+    const { developerId } = await params;
 
     const { data, error } = await supabase
       .from("manager_notes")
@@ -57,7 +57,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { developerId: string } }
+  { params }: { params: Promise<{ developerId: string }> }
 ) {
   return withManagerAuth(request, async (req, { userId, workspaceId }) => {
     const { createClient } = await import("@supabase/supabase-js");
@@ -66,7 +66,7 @@ export async function POST(
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
 
-    const developerId = params.developerId;
+    const { developerId } = await params;
     const body = await request.json();
     const { content } = body;
 
@@ -124,7 +124,7 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { developerId: string } }
+  { params }: { params: Promise<{ developerId: string }> }
 ) {
   return withManagerAuth(request, async (req, { userId, workspaceId }) => {
     const { createClient } = await import("@supabase/supabase-js");
@@ -133,7 +133,7 @@ export async function DELETE(
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
 
-    const developerId = params.developerId;
+    const { developerId } = await params;
 
     const { error } = await supabase
       .from("manager_notes")

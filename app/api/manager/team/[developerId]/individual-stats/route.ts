@@ -8,7 +8,7 @@ import { withManagerAuth } from "@/lib/api-middleware";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { developerId: string } }
+  { params }: { params: Promise<{ developerId: string }> }
 ) {
   return withManagerAuth(request, async (req, { userId, workspaceId }) => {
     const { createClient } = await import("@supabase/supabase-js");
@@ -17,7 +17,7 @@ export async function GET(
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
 
-    const developerId = params.developerId;
+    const { developerId } = await params;
 
     // Fetch developer info
     const { data: developer, error: devError } = await supabase

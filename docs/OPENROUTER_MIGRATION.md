@@ -1,4 +1,10 @@
-# OpenRouter Integration — Migration Guide
+# OpenRouter Integration — Migration Guide (superseded)
+
+> **Note**: This project has since migrated again, from OpenRouter to Groq
+> (`GROQ_API_KEY`, `https://api.groq.com/openai/v1`, models
+> `llama-3.1-8b-instant` / `llama-3.3-70b-versatile`). This document is kept
+> as a historical record of the earlier Anthropic → OpenRouter migration;
+> the current provider is Groq, not OpenRouter.
 
 Complete migration from Anthropic API to OpenRouter for LLM scoring and coaching.
 

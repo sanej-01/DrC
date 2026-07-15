@@ -320,7 +320,7 @@ Set up alerting for:
 
 **Savings from Manual-Only**:
 - No automatic API calls every 5 minutes
-- Reduced OpenRouter API costs (~$0.01 per scan)
+- Reduced Groq API costs (~$0.01 per scan)
 - Estimated savings: $40-100/month (if run weekly)
 
 **Trade-off**:

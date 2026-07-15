@@ -3,22 +3,22 @@
  * Phase 4.2: Model routing with cost optimization
  *
  * Strategy:
- * 1. OpenRouter triage: Quick assessment (cheap, fast)
- * 2. If should_score: OpenRouter full scoring (more capable)
+ * 1. Groq triage: Quick assessment (cheap, fast)
+ * 2. If should_score: Groq full scoring (more capable)
  * 3. Log model_version, tokens, latency, cost
  * 4. Fetch diff in-memory only (never stored)
  *
- * Uses OpenRouter API (compatible with multiple models)
+ * Uses Groq's OpenAI-compatible API
  */
 
 import { buildScoringPrompt, buildTriagePrompt, validateScoringResult, ScoringResult } from "./scoring-prompt";
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 
-// Model selection via OpenRouter
-const TRIAGE_MODEL = "openai/gpt-3.5-turbo"; // Fast, cheap triage
-const SCORING_MODEL = "openai/gpt-4"; // More capable scoring
+// Model selection via Groq
+const TRIAGE_MODEL = "llama-3.1-8b-instant"; // Fast, cheap triage
+const SCORING_MODEL = "llama-3.3-70b-versatile"; // More capable scoring
 
 export interface ScoringAuditEntry {
   triage_model: string;
@@ -56,13 +56,11 @@ async function triagePR(
   const prompt = buildTriagePrompt(prNumber, title, author, files_changed, additions, deletions);
   const startTime = Date.now();
 
-  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+  const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      "HTTP-Referer": "https://dr-codium.com",
-      "X-Title": "Dr Codium",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
       model: TRIAGE_MODEL,
@@ -78,7 +76,7 @@ async function triagePR(
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`OpenRouter triage failed: ${response.status} - ${error}`);
+    throw new Error(`Groq triage failed: ${response.status} - ${error}`);
   }
 
   const data = await response.json();
@@ -141,13 +139,11 @@ async function scorePR(
   const prompt = buildScoringPrompt(prNumber, title, author, files_changed, additions, deletions, diff);
   const startTime = Date.now();
 
-  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+  const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      "HTTP-Referer": "https://dr-codium.com",
-      "X-Title": "Dr Codium",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
       model: SCORING_MODEL,
@@ -163,7 +159,7 @@ async function scorePR(
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`OpenRouter scoring failed: ${response.status} - ${error}`);
+    throw new Error(`Groq scoring failed: ${response.status} - ${error}`);
   }
 
   const data = await response.json();
@@ -249,11 +245,12 @@ export async function routeAndScorePR(
 
   const totalLatency = Date.now() - overallStart;
 
-  // Calculate cost estimate (rough)
-  // Haiku: ~$0.25 per 1M tokens, Sonnet: ~$3 per 1M tokens
-  const haikuCost = ((triage.tokens_in + triage.tokens_out) / 1000000) * 0.25 * 100; // Convert to cents
-  const sonnetCost = ((scoring_tokens_in + scoring_tokens_out) / 1000000) * 3 * 100; // Convert to cents
-  const totalCost = Math.ceil(haikuCost + sonnetCost);
+  // Calculate cost estimate (rough, blended in+out rate per Groq's
+  // published per-token pricing)
+  // llama-3.1-8b-instant: ~$0.07 per 1M tokens, llama-3.3-70b-versatile: ~$0.69 per 1M tokens
+  const triageCost = ((triage.tokens_in + triage.tokens_out) / 1000000) * 0.07 * 100; // Convert to cents
+  const scoringCost = ((scoring_tokens_in + scoring_tokens_out) / 1000000) * 0.69 * 100; // Convert to cents
+  const totalCost = Math.ceil(triageCost + scoringCost);
 
   // Generate result hash for idempotency
   const resultHash = generateResultHash(scoring);
@@ -261,8 +258,8 @@ export async function routeAndScorePR(
   return {
     result: scoring,
     audit: {
-      triage_model: "claude-3-haiku-20240307",
-      scoring_model: "claude-3-sonnet-20240229",
+      triage_model: TRIAGE_MODEL,
+      scoring_model: SCORING_MODEL,
       triage_tokens_input: triage.tokens_in,
       triage_tokens_output: triage.tokens_out,
       scoring_tokens_input: scoring_tokens_in,

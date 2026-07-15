@@ -64,20 +64,18 @@ export async function POST(request: NextRequest) {
       "manager" // TODO: get from auth context
     );
 
-    // Call OpenRouter API
-    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-    const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-    const COACH_MODEL = "openai/gpt-4"; // Use GPT-4 for coaching (higher quality)
+    // Call Groq API
+    const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+    const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+    const COACH_MODEL = "llama-3.3-70b-versatile"; // Higher-quality model for coaching
 
     const startTime = Date.now();
 
-    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://dr-codium.com",
-        "X-Title": "Dr Codium",
+        Authorization: `Bearer ${GROQ_API_KEY}`,
       },
       body: JSON.stringify({
         model: COACH_MODEL,
@@ -97,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenRouter coach query failed: ${response.status} - ${error}`);
+      throw new Error(`Groq coach query failed: ${response.status} - ${error}`);
     }
 
     const data = await response.json();

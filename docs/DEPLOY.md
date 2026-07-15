@@ -11,7 +11,7 @@ Dr. Codium is deployed to Vercel with:
 - **Backend**: Next.js API routes
 - **Database**: Supabase (PostgreSQL + RLS)
 - **Webhooks**: GitHub App (PR events - automatic)
-- **LLM**: OpenRouter (multiple LLM providers)
+- **LLM**: Groq (fast inference for open models)
 - **Manual Polling**: GitHub PR poller (on-demand only, no automatic cron)
 
 ---
@@ -140,9 +140,9 @@ GITHUB_OAUTH_CLIENT_SECRET=<from GitHub OAuth App>
 GITHUB_OAUTH_REDIRECT_URI=https://<vercel-domain>/api/auth/github/callback
 ```
 
-### OpenRouter (LLM)
+### Groq (LLM)
 ```bash
-OPENROUTER_API_KEY=<from OpenRouter https://openrouter.io/keys>
+GROQ_API_KEY=<from Groq https://console.groq.com/keys>
 ```
 
 ### Cost Controls

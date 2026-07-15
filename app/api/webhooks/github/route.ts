@@ -3,6 +3,7 @@ import { verifyWebhookSignature, extractPRMetadata, getPRDiff } from "@/lib/gith
 import { checkSkipScoring, checkLargePR, recordAlert, recordFileDisclosure } from "@/lib/guards";
 import { scanDiffForSecrets, redactSecretsFromDiff, recordSecretAlert } from "@/lib/secret-scanner";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -213,6 +214,7 @@ export async function POST(request: NextRequest) {
     const { data: pr, error: insertError } = await supabase
       .from("pull_requests")
       .insert({
+        id: crypto.randomUUID(),
         workspace_id: repo.workspace_id,
         repo_id: repo.repo_id,
         github_pr_id: prMetadata.github_pr_id,

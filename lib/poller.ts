@@ -12,6 +12,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { Octokit } from "octokit";
+import crypto from "crypto";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -130,7 +131,9 @@ export async function pollRepositoryPRs(
           .single();
 
         if (checkError && checkError.code !== "PGRST116") {
+          const message = extractErrorMessage(checkError);
           console.error("Error checking duplicate:", checkError);
+          result.error = result.error ? `${result.error}; ${message}` : message;
           continue;
         }
 
@@ -144,6 +147,7 @@ export async function pollRepositoryPRs(
         const { error: insertError } = await supabase
           .from("pull_requests")
           .insert({
+            id: crypto.randomUUID(),
             workspace_id: workspaceId,
             repo_id: repoId,
             github_pr_id: pr.id,
@@ -163,7 +167,9 @@ export async function pollRepositoryPRs(
           if (insertError.code === "23505") {
             result.prs_duplicated++;
           } else {
+            const message = extractErrorMessage(insertError);
             console.error("Error inserting PR:", insertError);
+            result.error = result.error ? `${result.error}; ${message}` : message;
           }
         } else {
           result.prs_enqueued++;
@@ -181,7 +187,9 @@ export async function pollRepositoryPRs(
           });
         }
       } catch (prError) {
+        const message = extractErrorMessage(prError);
         console.error("Error processing PR:", prError);
+        result.error = result.error ? `${result.error}; ${message}` : message;
         continue;
       }
     }

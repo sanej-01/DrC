@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
     // Find workspace by repo
     const { data: repo } = await supabase
       .from("repos")
-      .select("workspace_id")
+      .select("workspace_id, repo_id")
       .eq("full_name", `${prMetadata.repo_owner}/${prMetadata.repo_name}`)
       .single();
 

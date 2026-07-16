@@ -124,6 +124,11 @@ export default function ManagerTeamPage() {
     );
   }
 
+  const workspaceId =
+    new URLSearchParams(
+      typeof window !== 'undefined' ? window.location.search : ''
+    ).get('workspace_id') || '';
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -140,9 +145,7 @@ export default function ManagerTeamPage() {
         <div className="mb-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">GitHub PR Scanning</h2>
           <ManualScanButton
-            workspaceId={new URLSearchParams(
-              typeof window !== 'undefined' ? window.location.search : ''
-            ).get('workspace_id') || ''}
+            workspaceId={workspaceId}
             onScanComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
             onScoreComplete={() => setPrDetailsRefreshKey((k) => k + 1)}
           />
@@ -151,7 +154,7 @@ export default function ManagerTeamPage() {
 
       {/* Garden visualization */}
       {members.length > 0 && stats ? (
-        <GardenVisualization members={members} stats={stats} />
+        <GardenVisualization members={members} stats={stats} workspaceId={workspaceId} />
       ) : (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-amber-800">
           <p className="font-semibold">No team data available</p>
@@ -167,9 +170,7 @@ export default function ManagerTeamPage() {
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">PR Details</h2>
         <PRDetailsList
-          workspaceId={new URLSearchParams(
-            typeof window !== 'undefined' ? window.location.search : ''
-          ).get('workspace_id') || ''}
+          workspaceId={workspaceId}
           refreshKey={prDetailsRefreshKey}
           onDataLoaded={(count) => setHasPrData(count > 0)}
         />

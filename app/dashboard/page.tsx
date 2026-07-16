@@ -86,47 +86,15 @@ export default function DashboardPage() {
         return;
       }
 
-      // Get aggregates (30-day window)
-      const { data: aggs, error: aggError } = await supabase
-        .from('pr_aggregates')
-        .select('*')
-        .eq('workspace_id', membership.workspace_id)
-        .eq('developer_id', user.id)
-        .single();
+      // Live schema has no separate pr_aggregates/coaching_cards tables
+      // (see supabase/seeds/create-poller-tables.sql) - both the 30-day
+      // score and coaching quests are derived here from pull_requests +
+      // pr_scores directly, same approach used by garden-stats and the
+      // manager individual-stats route.
+      const thirtyDaysAgo = new Date(
+        Date.now() - 30 * 24 * 60 * 60 * 1000
+      ).toISOString();
 
-      if (!aggError && aggs) {
-        const overall =
-          (aggs.avg_code_quality_30d || 0 +
-            (100 - (aggs.avg_bug_risk_30d || 0)) +
-            (aggs.avg_architecture_30d || 0) +
-            (aggs.avg_test_coverage_30d || 0)) /
-          4;
-
-        setStats({
-          avg_code_quality: aggs.avg_code_quality_30d,
-          avg_bug_risk: aggs.avg_bug_risk_30d,
-          avg_architecture: aggs.avg_architecture_30d,
-          avg_test_coverage: aggs.avg_test_coverage_30d,
-          overall_score: Math.round(overall * 10) / 10,
-          confidence_badge: aggs.confidence_badge_30d,
-          score_count_30d: aggs.score_count_30d,
-        });
-      }
-
-      // Get coaching cards (quests)
-      const { data: cards, error: cardError } = await supabase
-        .from('coaching_cards')
-        .select('*')
-        .eq('workspace_id', membership.workspace_id)
-        .eq('about_user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (!cardError && cards) {
-        setCoaches(cards);
-      }
-
-      // Get recent PRs with scores
       const { data: prList, error: prError } = await supabase
         .from('pull_requests')
         .select(
@@ -139,13 +107,13 @@ export default function DashboardPage() {
           additions_count,
           deletions_count,
           files_changed_count,
-          pr_scores!inner(code_quality, bug_risk, architecture, test_coverage)
+          pr_scores(code_quality, bug_risk, architecture, test_coverage, feedback)
         `
         )
         .eq('workspace_id', membership.workspace_id)
-        .eq('author_id', user.id)
+        .eq('developer_id', user.id)
         .order('merged_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (!prError && prList) {
         const formatted = prList.map((pr: any) => ({
@@ -160,6 +128,61 @@ export default function DashboardPage() {
           scores: pr.pr_scores?.[0],
         }));
         setPRs(formatted);
+
+        const withinLast30d = formatted.filter(
+          (pr) => pr.scores && pr.merged_at >= thirtyDaysAgo
+        );
+        const count = withinLast30d.length;
+
+        if (count > 0) {
+          const avg = (key: 'code_quality' | 'bug_risk' | 'architecture' | 'test_coverage') =>
+            withinLast30d.reduce((sum, pr) => sum + (pr.scores![key] || 0), 0) / count;
+
+          const quality = avg('code_quality');
+          const bugRisk = avg('bug_risk');
+          const architecture = avg('architecture');
+          const testCoverage = avg('test_coverage');
+          const overall =
+            (quality + (100 - bugRisk) + architecture + testCoverage) / 4;
+
+          setStats({
+            avg_code_quality: quality,
+            avg_bug_risk: bugRisk,
+            avg_architecture: architecture,
+            avg_test_coverage: testCoverage,
+            overall_score: Math.round(overall * 10) / 10,
+            confidence_badge: count >= 3 ? 'CONFIDENT' : 'LOW_CONFIDENCE',
+            score_count_30d: count,
+          });
+        } else {
+          setStats({
+            avg_code_quality: null,
+            avg_bug_risk: null,
+            avg_architecture: null,
+            avg_test_coverage: null,
+            overall_score: 0,
+            confidence_badge: 'LOW_CONFIDENCE',
+            score_count_30d: 0,
+          });
+        }
+
+        // Coaching quests = the feedback items already stored per PR
+        // score, flattened across recent PRs (most recent first).
+        const quests = formatted
+          .flatMap((pr) =>
+            (pr.scores?.feedback || []).map((item: any, idx: number) => ({
+              id: `${pr.id}-${idx}`,
+              pr_number: pr.number,
+              dimension: item.dimension,
+              title: item.title,
+              description: item.description,
+              severity: item.type,
+              file_path: item.file_path,
+              line_number: item.line_number,
+            }))
+          )
+          .slice(0, 5);
+        setCoaches(quests);
       }
 
       setLoading(false);

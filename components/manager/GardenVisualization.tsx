@@ -6,6 +6,8 @@
  * Stages: flourishing, mature, sapling, seedling, no_data
  */
 
+import { useRouter } from 'next/navigation';
+
 interface TeamMember {
   id: string;
   display_name: string;
@@ -33,6 +35,7 @@ interface GardenVisualizationProps {
     stage_breakdown: Record<string, number>;
     avg_score_30d: number | null;
   };
+  workspaceId: string;
 }
 
 function getStageConfig(stage: string) {
@@ -97,7 +100,9 @@ function getStageConfig(stage: string) {
 export default function GardenVisualization({
   members,
   stats,
+  workspaceId,
 }: GardenVisualizationProps) {
+  const router = useRouter();
   // Group members by stage
   const membersByStage = {
     flourishing: members.filter((m) => m.stage === 'flourishing'),
@@ -184,7 +189,17 @@ export default function GardenVisualization({
                 {stageMembers.map((member) => (
                   <div
                     key={member.id}
-                    className={`rounded-lg border ${config.border} bg-gradient-to-br ${config.color} p-5 shadow-sm hover:shadow-md transition-shadow`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      router.push(`/manager/team/${member.id}?workspace_id=${workspaceId}`)
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        router.push(`/manager/team/${member.id}?workspace_id=${workspaceId}`);
+                      }
+                    }}
+                    className={`rounded-lg border ${config.border} bg-gradient-to-br ${config.color} p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
                   >
                     {/* Header */}
                     <div className="flex items-start justify-between gap-2 mb-3">

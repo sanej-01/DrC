@@ -81,7 +81,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_created_at
 -- Create demo workspaces
 INSERT INTO public.workspaces (id, name, slug, description, created_at, updated_at)
 VALUES
-  ('ws-demo-001', 'Demo Workspace', 'demo-workspace', 'Demo workspace for testing', NOW(), NOW()),
+  ('ws-demo-001', 'jotDown Workspace', 'jotdown-workspace', 'jotDown workspace', NOW(), NOW()),
   ('ws-demo-002', 'Test Team', 'test-team', 'Test team workspace', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 

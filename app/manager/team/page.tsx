@@ -169,16 +169,18 @@ export default function ManagerTeamPage() {
       )}
 
       {/* Garden visualization */}
-      {members.length > 0 && stats ? (
-        <GardenVisualization members={members} stats={stats} workspaceId={workspaceId} />
-      ) : (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-amber-800">
-          <p className="font-semibold">No team data available</p>
-          <p className="text-sm mt-1">
-            Start inviting team members and they'll appear here once they've submitted code for review.
-          </p>
-        </div>
-      )}
+      <div style={{ marginBottom: 'var(--spacing-8)' }}>
+        {members.length > 0 && stats ? (
+          <GardenVisualization members={members} stats={stats} workspaceId={workspaceId} />
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-amber-800">
+            <p className="font-semibold">No team data available</p>
+            <p className="text-sm mt-1">
+              Start inviting team members and they'll appear here once they've submitted code for review.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* PR Details Accordion */}
       <div

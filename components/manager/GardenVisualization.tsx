@@ -181,7 +181,6 @@ export default function GardenVisualization({
                   <h3 className="font-semibold text-gray-900">
                     {config.label} ({stageMembers.length})
                   </h3>
-                  <p className="text-sm text-gray-600">{config.description}</p>
                 </div>
               </div>
 

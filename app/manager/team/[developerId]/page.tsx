@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DeveloperCoachingDashboard from '@/components/dashboard/DeveloperCoachingDashboard';
 import ManagerNoteEditor from '@/components/manager/ManagerNoteEditor';
-import ReviewDetailsModal from '@/components/manager/ReviewDetailsModal';
+import PRDetailsAccordion from '@/components/manager/PRDetailsAccordion';
 import { authedFetch } from '@/lib/authed-fetch';
 
 interface ReviewDetail {
@@ -79,7 +79,6 @@ export default function IndividualDeveloperPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string>('');
-  const [showReviews, setShowReviews] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -187,28 +186,8 @@ export default function IndividualDeveloperPage() {
           userRole="manager"
         />
 
-        {/* LLM analysis link */}
-        <div className="text-center">
-          <button
-            onClick={() => setShowReviews(true)}
-            className="inline-flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[10px] transition-colors"
-            style={{
-              color: 'var(--sage-ink)',
-              background: 'var(--sage-soft)',
-              border: '1px solid var(--line)',
-            }}
-          >
-            🔍 View full LLM analysis · {apiData.review_details.length} PR{apiData.review_details.length !== 1 ? 's' : ''}
-          </button>
-        </div>
+        <PRDetailsAccordion reviews={apiData.review_details} />
       </div>
-
-      {showReviews && (
-        <ReviewDetailsModal
-          reviews={apiData.review_details}
-          onClose={() => setShowReviews(false)}
-        />
-      )}
     </>
   );
 }

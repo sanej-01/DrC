@@ -165,8 +165,10 @@ export default function GardenVisualization({
         </div>
       </div>
 
-      {/* Garden Grid — all members in one flat grid, ordered by stage */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Developers */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="font-semibold text-gray-900 mb-4">Developers</h3>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {(['flourishing', 'mature', 'sapling', 'seedling', 'no_data'] as const).flatMap((stage) => {
           const stageMembers = membersByStage[stage];
           if (stageMembers.length === 0) return [];
@@ -185,64 +187,46 @@ export default function GardenVisualization({
                   router.push(`/manager/team/${member.id}?workspace_id=${workspaceId}`);
                 }
               }}
-              className={`rounded-lg border ${config.border} bg-gradient-to-br ${config.color} p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
+              className={`rounded-lg border ${config.border} bg-gradient-to-br ${config.color} p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
             >
               {/* Stage label */}
-              <div className="flex items-center gap-1.5 mb-3">
-                <span className="text-base">{config.emoji}</span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${config.badge}`}>
+              <div className="flex items-center gap-1 mb-2">
+                <span className="text-sm">{config.emoji}</span>
+                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${config.badge}`}>
                   {config.label}
                 </span>
               </div>
 
-              {/* Header */}
-              <div className="flex items-start justify-between gap-2 mb-3">
+              {/* Name + score */}
+              <div className="flex items-start justify-between gap-1 mb-3">
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-gray-900 truncate">
+                  <h4 className="font-semibold text-gray-900 text-sm truncate">
                     {member.display_name}
                   </h4>
-                  <p className="text-xs text-gray-600 truncate">
-                    {member.github_handle && `@${member.github_handle}`}
-                  </p>
+                  {member.github_handle && (
+                    <p className="text-xs text-gray-600 truncate">@{member.github_handle}</p>
+                  )}
                 </div>
                 {member.score_30d !== null && (
                   <div className="text-right flex-shrink-0">
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-lg font-bold text-gray-900 leading-none">
                       {member.score_30d}%
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Stats */}
-              {member.stage !== 'no_data' && (
-                <div className="space-y-2 mb-4 pt-3 pb-4 border-t border-gray-200/50">
-                  {([
-                    ['Quality', member.dimensions.quality],
-                    ['Risk', member.dimensions.bug_risk !== null ? 100 - member.dimensions.bug_risk : null],
-                    ['Architecture', member.dimensions.architecture],
-                    ['Tests', member.dimensions.tests],
-                  ] as [string, number | null][]).map(([label, val]) => (
-                    <div key={label} className="text-xs text-gray-700">
-                      <div className="flex justify-between">
-                        <span>{label}</span>
-                        <span className="font-semibold">{val !== null ? Math.round(val) : '—'}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* Footer */}
-              <div className="flex items-center justify-between pt-3 border-t border-gray-200/50 text-xs text-gray-600">
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200/50 text-xs text-gray-600">
                 <span>{member.pr_count > 0 ? `${member.pr_count} PR${member.pr_count !== 1 ? 's' : ''}` : 'No PRs'}</span>
-                <span className={`px-2 py-1 rounded ${config.badge}`}>
+                <span className={`px-1.5 py-0.5 rounded ${config.badge}`}>
                   {member.confidence === 'CONFIDENT' ? '✓' : '⚠️'}
                 </span>
               </div>
             </div>
           ));
         })}
+      </div>
       </div>
     </div>
   );

@@ -2,26 +2,23 @@
 
 /**
  * Manager Individual Developer Detail — Phase 6.2
- * Drill-down view with 90-day trajectory, PR heat, and coaching history
+ * Drill-down view showing the same coaching dashboard layout as /dashboard,
+ * wired to the individual developer's data.
  */
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import DeveloperTrajectory from '@/components/manager/DeveloperTrajectory';
-import PRHeatMap from '@/components/manager/PRHeatMap';
-import CoachingHistory from '@/components/manager/CoachingHistory';
+import DeveloperCoachingDashboard from '@/components/dashboard/DeveloperCoachingDashboard';
 import ManagerNoteEditor from '@/components/manager/ManagerNoteEditor';
 import { authedFetch } from '@/lib/authed-fetch';
 
-interface Developer {
-  id: string;
-  display_name: string;
-  email: string;
-  github_handle?: string;
-}
-
 interface IndividualStats {
-  developer: Developer;
+  developer: {
+    id: string;
+    display_name: string;
+    email: string;
+    github_handle?: string;
+  };
   trajectory: {
     score_90d: number | null;
     score_60d: number | null;
@@ -60,12 +57,43 @@ interface IndividualStats {
   } | null;
 }
 
+interface DashboardData {
+  firstName: string;
+  overallScore: number;
+  scoreCount30d: number;
+  winsLogged: number;
+  confident: boolean;
+  dimensions: {
+    code_quality: number | null;
+    bug_risk: number | null;
+    architecture: number | null;
+    test_coverage: number | null;
+  };
+  momentum: { label: string; arrow: string; color: string };
+  streak: boolean[];
+  quests: Array<{
+    id: string;
+    type: 'GOOD' | 'IMPROVE' | 'FIX' | 'SUGGEST';
+    title: string;
+    description: string;
+    pr_number: number;
+  }>;
+  latestCoaching: {
+    pr_number: number;
+    pr_title: string;
+    headline: string;
+    tag: string | null;
+    body: string;
+  } | null;
+}
+
 export default function IndividualDeveloperPage() {
   const params = useParams();
   const router = useRouter();
   const developerId = params.developerId as string;
 
   const [stats, setStats] = useState<IndividualStats | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string>('');
@@ -98,6 +126,76 @@ export default function IndividualDeveloperPage() {
 
         const data = await response.json();
         setStats(data);
+
+        // Transform API response to dashboard data format
+        const firstName = (data.developer.display_name || data.developer.email || 'there')
+          .split(/[\s@]/)[0];
+
+        const now = Date.now();
+        const startOfWeek = new Date();
+        const dow = (startOfWeek.getDay() + 6) % 7;
+        startOfWeek.setHours(0, 0, 0, 0);
+        startOfWeek.setDate(startOfWeek.getDate() - dow);
+
+        const streak = [false, false, false, false, false, false, false];
+        data.recent_prs.forEach((pr: any) => {
+          const d = new Date(pr.merged_at);
+          if (d >= startOfWeek) {
+            const idx = (d.getDay() + 6) % 7;
+            streak[idx] = true;
+          }
+        });
+
+        let momentum = { label: 'building', arrow: '·', color: 'var(--ink-3)' };
+        if (data.trajectory.score_90d !== null && data.trajectory.score_30d !== null) {
+          const diff = data.trajectory.score_30d - data.trajectory.score_90d;
+          if (diff > 5) momentum = { label: 'improving', arrow: '▲', color: 'var(--good)' };
+          else if (diff < -5) momentum = { label: 'watch', arrow: '▼', color: 'var(--bad)' };
+          else momentum = { label: 'steady', arrow: '—', color: 'var(--ink-2)' };
+        }
+
+        const winsLogged = data.coaching.breakdown.GOOD || 0;
+        const confident = data.aggregates?.confidence_30d === 'CONFIDENT';
+
+        const quests = data.recent_prs
+          .flatMap((pr: any) => {
+            if (!pr.score) return [];
+            // In this API, we don't have the full feedback item details,
+            // so we construct minimal quest items from the coaching breakdown.
+            // Ideally the API would return recent feedback items per PR.
+            return [];
+          })
+          .slice(0, 3);
+
+        let latestCoaching = null;
+        const latest = data.recent_prs[0];
+        if (latest && latest.score) {
+          latestCoaching = {
+            pr_number: latest.pr_number,
+            pr_title: latest.title,
+            headline: 'Reviewed and scored',
+            tag: null,
+            body: 'This PR received LLM analysis. Detailed feedback is available via the coaching history.',
+          };
+        }
+
+        setDashboardData({
+          firstName,
+          overallScore: data.trajectory.score_30d || 0,
+          scoreCount30d: data.trajectory.pr_count_30d,
+          winsLogged,
+          confident,
+          dimensions: {
+            code_quality: null,
+            bug_risk: null,
+            architecture: null,
+            test_coverage: null,
+          },
+          momentum,
+          streak,
+          quests,
+          latestCoaching,
+        });
       } catch (err) {
         setError(
           err instanceof Error ? err.message : 'Failed to load developer stats'
@@ -121,7 +219,7 @@ export default function IndividualDeveloperPage() {
     );
   }
 
-  if (error || !stats) {
+  if (error || !stats || !dashboardData) {
     return (
       <div className="p-8">
         <div className="mb-4">
@@ -140,171 +238,26 @@ export default function IndividualDeveloperPage() {
     );
   }
 
-  const dev = stats.developer;
-  const currentScore = stats.trajectory.score_30d;
-
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
+    <>
+      <div className="p-8 pb-4">
         <button
           onClick={() => router.back()}
-          className="text-blue-600 hover:text-blue-800 font-medium mb-4"
+          className="text-blue-600 hover:text-blue-800 font-medium"
         >
           ← Back to team
         </button>
-
-        <div className="flex items-end gap-6">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">
-              {dev.display_name}
-            </h1>
-            {dev.github_handle && (
-              <p className="text-gray-600 mt-1">@{dev.github_handle}</p>
-            )}
-            <p className="text-sm text-gray-500 mt-1">{dev.email}</p>
-          </div>
-
-          {/* Current score card */}
-          {currentScore !== null && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6 text-center">
-              <div className="text-sm text-gray-600 mb-2">30-Day Score</div>
-              <div className="text-4xl font-bold text-gray-900">
-                {currentScore}
-              </div>
-              <div className="text-xs text-gray-600 mt-2">/100</div>
-              {stats.aggregates && (
-                <div className="mt-3 text-xs">
-                  {stats.aggregates.confidence_30d === 'CONFIDENT' ? (
-                    <span className="text-green-700 font-semibold">
-                      ✓ Confident
-                    </span>
-                  ) : (
-                    <span className="text-amber-700 font-semibold">
-                      ⚠️ Low confidence (&lt; 3 PRs)
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
+      <DeveloperCoachingDashboard {...dashboardData} />
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* 90-day trajectory */}
-        <DeveloperTrajectory trajectory={stats.trajectory} />
-
-        {/* Quick stats */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Quick Stats
-          </h2>
-
-          <div className="space-y-4">
-            {/* PR count */}
-            <div className="pb-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                PR Activity
-              </h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Last 30 days</span>
-                  <span className="font-semibold text-gray-900">
-                    {stats.trajectory.pr_count_30d} PRs
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Last 60 days</span>
-                  <span className="font-semibold text-gray-900">
-                    {stats.trajectory.pr_count_60d} PRs
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Last 90 days</span>
-                  <span className="font-semibold text-gray-900">
-                    {stats.trajectory.pr_count_90d} PRs
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Coaching summary */}
-            <div className="pb-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Coaching Feedback
-              </h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Well Done</span>
-                  <span className="font-semibold text-green-700">
-                    {stats.coaching.breakdown.GOOD}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Improve</span>
-                  <span className="font-semibold text-blue-700">
-                    {stats.coaching.breakdown.IMPROVE}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Fix</span>
-                  <span className="font-semibold text-red-700">
-                    {stats.coaching.breakdown.FIX}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Suggestion</span>
-                  <span className="font-semibold text-amber-700">
-                    {stats.coaching.breakdown.SUGGEST}
-                  </span>
-                </div>
-              </div>
-              <div className="text-sm text-gray-600 mt-3 pt-3 border-t border-gray-200">
-                Total: {stats.coaching.total} coaching items
-              </div>
-            </div>
-
-            {/* Trend indicator */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Overall Trend
-              </h3>
-              <div className="text-center py-3 px-4 rounded-lg bg-gray-50 border border-gray-200">
-                <div className="text-2xl mb-2">
-                  {stats.trajectory.trend === 'improving' && '📈'}
-                  {stats.trajectory.trend === 'declining' && '📉'}
-                  {stats.trajectory.trend === 'stable' && '➡️'}
-                </div>
-                <div className="font-semibold text-gray-900 capitalize">
-                  {stats.trajectory.trend}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Coaching history */}
-      <div className="mb-8">
-        <CoachingHistory
-          cards={[]} // TODO: Fetch coaching cards from API
-          breakdown={stats.coaching.breakdown}
+      {/* Manager notes section */}
+      <div className="mx-auto max-w-2xl px-6 py-8">
+        <ManagerNoteEditor
+          developerId={stats.developer.id}
+          workspaceId={workspaceId}
+          userRole="manager"
         />
       </div>
-
-      {/* Recent PRs */}
-      <div className="mb-8">
-        <PRHeatMap prs={stats.recent_prs} />
-      </div>
-
-      {/* Manager notes (Phase 6.3) */}
-      <ManagerNoteEditor
-        developerId={developerId}
-        workspaceId={workspaceId}
-        userRole="manager" // TODO: Get from auth context
-      />
-    </div>
+    </>
   );
 }

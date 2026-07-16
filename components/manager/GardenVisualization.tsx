@@ -168,7 +168,7 @@ export default function GardenVisualization({
       {/* Developers */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Developers</h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {(['flourishing', 'mature', 'sapling', 'seedling', 'no_data'] as const).flatMap((stage) => {
           const stageMembers = membersByStage[stage];
           if (stageMembers.length === 0) return [];
@@ -216,10 +216,56 @@ export default function GardenVisualization({
                 )}
               </div>
 
+              {/* Stats */}
+              {member.stage !== 'no_data' && (
+                <div className="space-y-2 mb-4 pt-3 pb-4 border-t border-gray-200/50">
+                  <div className="text-xs text-gray-700">
+                    <div className="flex justify-between">
+                      <span>Quality</span>
+                      <span className="font-semibold">
+                        {member.dimensions.quality !== null
+                          ? Math.round(member.dimensions.quality)
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-700">
+                    <div className="flex justify-between">
+                      <span>Risk</span>
+                      <span className="font-semibold">
+                        {member.dimensions.bug_risk !== null
+                          ? Math.round(100 - member.dimensions.bug_risk)
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-700">
+                    <div className="flex justify-between">
+                      <span>Architecture</span>
+                      <span className="font-semibold">
+                        {member.dimensions.architecture !== null
+                          ? Math.round(member.dimensions.architecture)
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-700">
+                    <div className="flex justify-between">
+                      <span>Tests</span>
+                      <span className="font-semibold">
+                        {member.dimensions.tests !== null
+                          ? Math.round(member.dimensions.tests)
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Footer */}
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200/50 text-xs text-gray-600">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-200/50 text-xs text-gray-600">
                 <span>{member.pr_count > 0 ? `${member.pr_count} PR${member.pr_count !== 1 ? 's' : ''}` : 'No PRs'}</span>
-                <span className={`px-1.5 py-0.5 rounded ${config.badge}`}>
+                <span className={`px-2 py-1 rounded ${config.badge}`}>
                   {member.confidence === 'CONFIDENT' ? '✓' : '⚠️'}
                 </span>
               </div>

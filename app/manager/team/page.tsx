@@ -48,6 +48,18 @@ export default function ManagerTeamPage() {
   const [prDetailsRefreshKey, setPrDetailsRefreshKey] = useState(0);
   const [hasPrData, setHasPrData] = useState<boolean | null>(null);
 
+  // Initial value + live updates for the "Show members with no PRs"
+  // toggle, which now lives in the Topbar account menu instead of on
+  // this page - see the matching localStorage/event code in Topbar.tsx.
+  useEffect(() => {
+    setIncludeZeroPR(localStorage.getItem('drc_include_zero_pr') === 'true');
+    const handleToggle = (e: Event) => {
+      setIncludeZeroPR((e as CustomEvent<boolean>).detail);
+    };
+    window.addEventListener('drc:includeZeroPRChange', handleToggle);
+    return () => window.removeEventListener('drc:includeZeroPRChange', handleToggle);
+  }, []);
+
   useEffect(() => {
     const fetchTeamStats = async () => {
       try {
@@ -137,21 +149,6 @@ export default function ManagerTeamPage() {
         </div>
       )}
 
-      {/* Toggle for zero-PR members */}
-      <div className="mb-8 flex items-center gap-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={includeZeroPR}
-            onChange={(e) => setIncludeZeroPR(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300"
-          />
-          <span className="text-sm text-gray-700">
-            Show members with no PRs ({stats?.members_no_data || 0})
-          </span>
-        </label>
-      </div>
-
       {/* Garden visualization */}
       {members.length > 0 && stats ? (
         <GardenVisualization members={members} stats={stats} />
@@ -164,8 +161,10 @@ export default function ManagerTeamPage() {
         </div>
       )}
 
-      {/* PR Details + LLM Analysis */}
-      <div className="mt-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+      {/* Spacer + divider to visually separate the garden from PR Details */}
+      <div className="mt-16 pt-8 border-t border-gray-200" />
+
+      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">PR Details</h2>
         <PRDetailsList
           workspaceId={new URLSearchParams(

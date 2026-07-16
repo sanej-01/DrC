@@ -16,7 +16,9 @@ export default function Topbar() {
   const [isClearing, setIsClearing] = useState(false);
   const [statusText, setStatusText] = useState<{ text: string; isError: boolean } | null>(null);
   const [userInitial, setUserInitial] = useState<string>("?");
+  const [includeZeroPR, setIncludeZeroPR] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isTeamPage = pathname.startsWith("/manager/team");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -24,6 +26,21 @@ export default function Topbar() {
       if (email) setUserInitial(email.charAt(0).toUpperCase());
     });
   }, []);
+
+  // "Show members with no PRs" is a page-local display preference for
+  // Team Garden, not server state - synced via localStorage + a custom
+  // event instead of the URL so toggling it here doesn't trigger a
+  // navigation or need the page to adopt useSearchParams (which would
+  // force this statically-generated route into CSR-bailout territory).
+  useEffect(() => {
+    setIncludeZeroPR(localStorage.getItem("drc_include_zero_pr") === "true");
+  }, []);
+
+  const handleToggleZeroPR = (checked: boolean) => {
+    setIncludeZeroPR(checked);
+    localStorage.setItem("drc_include_zero_pr", String(checked));
+    window.dispatchEvent(new CustomEvent("drc:includeZeroPRChange", { detail: checked }));
+  };
 
   const activeRole = pathname.startsWith("/manager")
     ? "mgr"
@@ -211,6 +228,23 @@ export default function Topbar() {
               boxShadow: "var(--shadow)",
             }}
           >
+            {isTeamPage && (
+              <>
+                <label
+                  className="flex items-center gap-2 px-4 py-3 text-sm cursor-pointer hover:bg-gray-50"
+                  style={{ color: "var(--ink)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeZeroPR}
+                    onChange={(e) => handleToggleZeroPR(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  Show members with no PRs
+                </label>
+                <div style={{ borderTop: "1px solid var(--line)" }} />
+              </>
+            )}
             {workspaceId && (
               <>
                 <button

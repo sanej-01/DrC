@@ -187,8 +187,8 @@ export default function GardenVisualization({
                     className={`rounded-lg border ${config.border} bg-gradient-to-br ${config.color} p-5 shadow-sm hover:shadow-md transition-shadow`}
                   >
                     {/* Header */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-gray-900 truncate">
                           {member.display_name}
                         </h4>
@@ -197,7 +197,7 @@ export default function GardenVisualization({
                         </p>
                       </div>
                       {member.score_30d !== null && (
-                        <div className="text-right ml-2">
+                        <div className="text-right flex-shrink-0">
                           <div className="text-2xl font-bold text-gray-900">
                             {member.score_30d}
                           </div>
@@ -208,7 +208,7 @@ export default function GardenVisualization({
 
                     {/* Stats */}
                     {member.stage !== 'no_data' && (
-                      <div className="space-y-2 mb-4 pb-4 border-t border-gray-200/50">
+                      <div className="space-y-2 mb-4 pt-3 pb-4 border-t border-gray-200/50">
                         <div className="text-xs text-gray-700">
                           <div className="flex justify-between">
                             <span>Quality</span>

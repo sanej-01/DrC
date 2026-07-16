@@ -176,11 +176,11 @@ export default function Topbar() {
               key={r}
               onClick={() => !disabled && goTo(r)}
               disabled={disabled}
-              className="border-0 font-inherit text-xs px-3 py-[6px] rounded-[7px] transition-all"
+              className="border-0 text-base tracking-tight px-3 py-[6px] rounded-[7px] transition-all"
               style={{
                 background: isActive ? "#fff" : "transparent",
                 color: disabled ? "var(--line)" : isActive ? "var(--ink)" : "var(--ink-2)",
-                fontWeight: isActive ? "500" : "400",
+                fontWeight: isActive ? "600" : "500",
                 boxShadow: isActive ? "var(--shadow)" : "none",
                 cursor: disabled ? "not-allowed" : "pointer",
               }}

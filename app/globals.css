@@ -55,16 +55,22 @@
   --radius-base: var(--radius);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Scoped to @layer base so Tailwind's utility layer (p-5, mb-4, etc.)
+   still wins the cascade - an unlayered `* { padding: 0 }` here would
+   beat every utility class regardless of specificity, since unlayered
+   rules always outrank layered ones. */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font);
-  -webkit-font-smoothing: antialiased;
-  line-height: 1.5;
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
 }

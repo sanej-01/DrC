@@ -194,6 +194,54 @@ export async function GET(
     const confidenceFor = (count: number) =>
       count >= 3 ? "CONFIDENT" : "LOW_CONFIDENCE";
 
+    // 30-day dimension averages (same formula as /dashboard)
+    const dimensions_30d = {
+      code_quality: avg30.quality,
+      bug_risk: avg30.risk,
+      architecture: avg30.architecture,
+      test_coverage: avg30.tests,
+    };
+
+    // Actionable feedback items from last 90 days (non-GOOD only),
+    // each annotated with the PR number they came from.
+    const quest_items = withScores
+      .filter((r) => now - new Date(r.pr.merged_at).getTime() <= 90 * 24 * 60 * 60 * 1000)
+      .flatMap(({ pr, score }) =>
+        (score.feedback || [])
+          .filter((f) => f.type !== "GOOD")
+          .map((f, i) => ({
+            id: `${pr.id}-${i}`,
+            type: f.type,
+            title: (f as any).title || "",
+            description: (f as any).description || "",
+            dimension: (f as any).dimension || null,
+            pr_number: pr.number,
+          }))
+      )
+      .slice(0, 3);
+
+    // Latest coaching: most recent scored PR's overall_assessment + lead feedback
+    const latestScored = withScores[0];
+    const latest_coaching = latestScored
+      ? (() => {
+          const fb = latestScored.score.feedback || [];
+          const lead = fb.find((f) => f.type !== "GOOD") || fb[0];
+          return {
+            pr_number: latestScored.pr.number,
+            pr_title: latestScored.pr.title,
+            headline:
+              (lead as any)?.title ||
+              (latestScored.score as any).overall_assessment ||
+              "Reviewed — nothing urgent flagged",
+            tag: (lead as any)?.dimension || null,
+            body:
+              (latestScored.score as any).overall_assessment ||
+              (lead as any)?.description ||
+              "No detailed notes for this PR.",
+          };
+        })()
+      : null;
+
     return NextResponse.json({
       developer: {
         id: developerId,
@@ -212,6 +260,9 @@ export async function GET(
         confidence_60d: confidenceFor(scores60.length),
         confidence_90d: confidenceFor(scores90.length),
       },
+      dimensions_30d,
+      quest_items,
+      latest_coaching,
     });
   });
 }

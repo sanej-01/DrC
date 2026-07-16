@@ -214,9 +214,8 @@ export default function GardenVisualization({
                       {member.score_30d !== null && (
                         <div className="text-right flex-shrink-0">
                           <div className="text-2xl font-bold text-gray-900">
-                            {member.score_30d}
+                            {member.score_30d}%
                           </div>
-                          <div className="text-xs text-gray-600">/100</div>
                         </div>
                       )}
                     </div>

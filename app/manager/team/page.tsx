@@ -180,8 +180,6 @@ export default function ManagerTeamPage() {
         </div>
       )}
 
-      <div className="mt-8 border-t border-gray-200" />
-
       {/* PR Details Accordion */}
       <div
         className="rounded-[14px] overflow-hidden"

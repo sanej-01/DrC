@@ -46,15 +46,19 @@ export default function Topbar() {
     ? "mgr"
     : pathname.startsWith("/dashboard")
       ? "dev"
-      : null;
+      : pathname.startsWith("/vp")
+        ? "vp"
+        : null;
 
   const goTo = (role: "dev" | "mgr" | "vp") => {
+    const qs = workspaceId ? `?workspace_id=${workspaceId}` : "";
     if (role === "dev") {
-      router.push(`/dashboard${workspaceId ? `?workspace_id=${workspaceId}` : ""}`);
+      router.push(`/dashboard${qs}`);
     } else if (role === "mgr") {
-      router.push(`/manager/team${workspaceId ? `?workspace_id=${workspaceId}` : ""}`);
+      router.push(`/manager/team${qs}`);
+    } else {
+      router.push(`/vp${qs}`);
     }
-    // VP dashboard doesn't exist yet — tab is disabled below
   };
 
   // Close the menu on outside click
@@ -169,22 +173,18 @@ export default function Topbar() {
         style={{ background: "var(--bg)", border: "1px solid var(--line)" }}
       >
         {(["dev", "mgr", "vp"] as const).map((r) => {
-          const disabled = r === "vp";
           const isActive = activeRole === r;
           return (
             <button
               key={r}
-              onClick={() => !disabled && goTo(r)}
-              disabled={disabled}
-              className="border-0 text-base tracking-tight px-3 py-[6px] rounded-[7px] transition-all"
+              onClick={() => goTo(r)}
+              className="border-0 text-base tracking-tight px-3 py-[6px] rounded-[7px] transition-all cursor-pointer"
               style={{
                 background: isActive ? "#fff" : "transparent",
-                color: disabled ? "var(--line)" : isActive ? "var(--ink)" : "var(--ink-2)",
+                color: isActive ? "var(--ink)" : "var(--ink-2)",
                 fontWeight: isActive ? "600" : "500",
                 boxShadow: isActive ? "var(--shadow)" : "none",
-                cursor: disabled ? "not-allowed" : "pointer",
               }}
-              title={disabled ? "Coming soon" : undefined}
             >
               {r === "dev"
                 ? "Developer"

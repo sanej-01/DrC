@@ -4,7 +4,30 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DeveloperCoachingDashboard from '@/components/dashboard/DeveloperCoachingDashboard';
 import ManagerNoteEditor from '@/components/manager/ManagerNoteEditor';
+import ReviewDetailsModal from '@/components/manager/ReviewDetailsModal';
 import { authedFetch } from '@/lib/authed-fetch';
+
+interface ReviewDetail {
+  pr_number: number;
+  pr_title: string;
+  merged_at: string;
+  overall_score: number;
+  dimensions: {
+    code_quality: number | null;
+    bug_risk: number | null;
+    architecture: number | null;
+    test_coverage: number | null;
+  };
+  overall_assessment: string | null;
+  feedback: Array<{
+    type: 'GOOD' | 'IMPROVE' | 'FIX' | 'SUGGEST';
+    dimension: string | null;
+    title: string | null;
+    description: string | null;
+    file_path: string | null;
+    line_number: number | null;
+  }>;
+}
 
 interface ApiResponse {
   developer: {
@@ -44,6 +67,7 @@ interface ApiResponse {
     body: string;
   } | null;
   recent_prs: Array<{ merged_at: string }>;
+  review_details: ReviewDetail[];
 }
 
 export default function IndividualDeveloperPage() {
@@ -55,6 +79,7 @@ export default function IndividualDeveloperPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [showReviews, setShowReviews] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -110,7 +135,6 @@ export default function IndividualDeveloperPage() {
     </div>
   );
 
-  // Compute this-week streak from recent_prs merged_at
   const streak = [false, false, false, false, false, false, false];
   const startOfWeek = new Date();
   startOfWeek.setHours(0, 0, 0, 0);
@@ -156,13 +180,35 @@ export default function IndividualDeveloperPage() {
 
       <DeveloperCoachingDashboard {...dashboardProps} />
 
-      <div className="mx-auto max-w-2xl px-6 pb-8">
+      <div className="mx-auto max-w-2xl px-6 pb-8 space-y-6">
         <ManagerNoteEditor
           developerId={apiData.developer.id}
           workspaceId={workspaceId}
           userRole="manager"
         />
+
+        {/* LLM analysis link */}
+        <div className="text-center">
+          <button
+            onClick={() => setShowReviews(true)}
+            className="inline-flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[10px] transition-colors"
+            style={{
+              color: 'var(--sage-ink)',
+              background: 'var(--sage-soft)',
+              border: '1px solid var(--line)',
+            }}
+          >
+            🔍 View full LLM analysis · {apiData.review_details.length} PR{apiData.review_details.length !== 1 ? 's' : ''}
+          </button>
+        </div>
       </div>
+
+      {showReviews && (
+        <ReviewDetailsModal
+          reviews={apiData.review_details}
+          onClose={() => setShowReviews(false)}
+        />
+      )}
     </>
   );
 }

@@ -3,6 +3,11 @@ import { withManagerAuth } from "@/lib/api-middleware";
 
 interface FeedbackItem {
   type: "GOOD" | "IMPROVE" | "FIX" | "SUGGEST";
+  dimension?: string;
+  title?: string;
+  description?: string;
+  file_path?: string;
+  line_number?: number;
 }
 
 interface ScoreRow {
@@ -10,6 +15,7 @@ interface ScoreRow {
   bug_risk: number | null;
   architecture: number | null;
   test_coverage: number | null;
+  overall_assessment?: string | null;
   feedback: FeedbackItem[] | null;
 }
 
@@ -263,6 +269,32 @@ export async function GET(
       dimensions_30d,
       quest_items,
       latest_coaching,
+      review_details: withScores.slice(0, 20).map(({ pr, score }) => ({
+        pr_number: pr.number,
+        pr_title: pr.title,
+        merged_at: pr.merged_at,
+        overall_score: calculateOverallScore({
+          quality: score.code_quality,
+          risk: score.bug_risk,
+          architecture: score.architecture,
+          tests: score.test_coverage,
+        }),
+        dimensions: {
+          code_quality: score.code_quality,
+          bug_risk: score.bug_risk,
+          architecture: score.architecture,
+          test_coverage: score.test_coverage,
+        },
+        overall_assessment: score.overall_assessment || null,
+        feedback: (score.feedback || []).map((f) => ({
+          type: f.type,
+          dimension: f.dimension || null,
+          title: f.title || null,
+          description: f.description || null,
+          file_path: f.file_path || null,
+          line_number: f.line_number || null,
+        })),
+      })),
     });
   });
 }

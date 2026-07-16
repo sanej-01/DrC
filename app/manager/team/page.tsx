@@ -64,6 +64,24 @@ export default function ManagerTeamPage() {
     return () => window.removeEventListener('drc:includeZeroPRChange', handleToggle);
   }, []);
 
+  // Team/Projects pills live in the Topbar (next to the brand and role
+  // switcher) - same localStorage + custom-event sync pattern as above.
+  useEffect(() => {
+    const stored = localStorage.getItem('drc_manager_view');
+    if (stored === 'projects' || stored === 'team') setView(stored);
+    const handleViewChange = (e: Event) => {
+      setView((e as CustomEvent<'team' | 'projects'>).detail);
+    };
+    window.addEventListener('drc:managerViewChange', handleViewChange);
+    return () => window.removeEventListener('drc:managerViewChange', handleViewChange);
+  }, []);
+
+  const switchView = (v: 'team' | 'projects') => {
+    setView(v);
+    localStorage.setItem('drc_manager_view', v);
+    window.dispatchEvent(new CustomEvent('drc:managerViewChange', { detail: v }));
+  };
+
   useEffect(() => {
     // Guards against toggling the checkbox faster than a request
     // round-trip: without this, an in-flight request for the *previous*
@@ -149,30 +167,6 @@ export default function ManagerTeamPage() {
 
   return (
     <div className="p-8">
-      {/* Team / Projects view toggle (prototype's left-nav pills) */}
-      <div
-        className="inline-flex gap-[3px] p-[3px] rounded-[12px] mb-6"
-        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
-      >
-        {(['team', 'projects'] as const).map((v) => {
-          const isActive = view === v;
-          return (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className="border-0 text-[14px] font-medium px-4 py-[7px] rounded-[9px] transition-all cursor-pointer"
-              style={{
-                background: isActive ? 'var(--sage)' : 'transparent',
-                color: isActive ? '#fff' : 'var(--ink-2)',
-                fontWeight: isActive ? 600 : 500,
-              }}
-            >
-              {v === 'team' ? 'Team' : 'Projects'}
-            </button>
-          );
-        })}
-      </div>
-
       {view === 'projects' ? (
         <>
           <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
@@ -183,7 +177,7 @@ export default function ManagerTeamPage() {
               </p>
             </div>
             <button
-              onClick={() => setView('team')}
+              onClick={() => switchView('team')}
               className="text-[13px] font-medium px-4 py-2 rounded-[10px] cursor-pointer flex-shrink-0"
               style={{
                 background: 'var(--surface)',

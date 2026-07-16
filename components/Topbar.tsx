@@ -17,8 +17,12 @@ export default function Topbar() {
   const [statusText, setStatusText] = useState<{ text: string; isError: boolean } | null>(null);
   const [userInitial, setUserInitial] = useState<string>("?");
   const [includeZeroPR, setIncludeZeroPR] = useState(false);
+  const [managerView, setManagerView] = useState<"team" | "projects">("team");
   const menuRef = useRef<HTMLDivElement>(null);
   const isTeamPage = pathname.startsWith("/manager/team");
+  // Only the team overview page has the Team/Projects views, not the
+  // per-developer drill-down beneath it.
+  const showViewPills = pathname === "/manager/team";
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -40,6 +44,26 @@ export default function Topbar() {
     setIncludeZeroPR(checked);
     localStorage.setItem("drc_include_zero_pr", String(checked));
     window.dispatchEvent(new CustomEvent("drc:includeZeroPRChange", { detail: checked }));
+  };
+
+  // Team/Projects view for the manager page lives here in the topbar
+  // (prototype layout) but the content is rendered by the page - synced
+  // via localStorage + custom event, same pattern as includeZeroPR.
+  // Listens too, so the page's "View by people" button stays in sync.
+  useEffect(() => {
+    const stored = localStorage.getItem("drc_manager_view");
+    if (stored === "projects" || stored === "team") setManagerView(stored);
+    const handleViewChange = (e: Event) => {
+      setManagerView((e as CustomEvent<"team" | "projects">).detail);
+    };
+    window.addEventListener("drc:managerViewChange", handleViewChange);
+    return () => window.removeEventListener("drc:managerViewChange", handleViewChange);
+  }, []);
+
+  const handleViewSwitch = (v: "team" | "projects") => {
+    setManagerView(v);
+    localStorage.setItem("drc_manager_view", v);
+    window.dispatchEvent(new CustomEvent("drc:managerViewChange", { detail: v }));
   };
 
   const activeRole = pathname.startsWith("/manager")
@@ -163,6 +187,29 @@ export default function Topbar() {
         </div>
         <div className="font-semibold text-base tracking-tight">Dr Codium</div>
       </button>
+
+      {/* Team / Projects view pills (manager team page only) */}
+      {showViewPills && (
+        <div className="flex gap-1 ml-4">
+          {(["team", "projects"] as const).map((v) => {
+            const isActive = managerView === v;
+            return (
+              <button
+                key={v}
+                onClick={() => handleViewSwitch(v)}
+                className="border-0 text-[14px] px-4 py-[7px] rounded-[10px] transition-all cursor-pointer"
+                style={{
+                  background: isActive ? "var(--sage)" : "transparent",
+                  color: isActive ? "#fff" : "var(--ink-2)",
+                  fontWeight: isActive ? 600 : 500,
+                }}
+              >
+                {v === "team" ? "Team" : "Projects"}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />

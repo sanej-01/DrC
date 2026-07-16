@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { authedFetch } from "@/lib/authed-fetch";
+import { supabase } from "@/lib/supabase";
 
 export default function Topbar() {
   const router = useRouter();
@@ -14,7 +15,15 @@ export default function Topbar() {
   const [isScanning, setIsScanning] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [statusText, setStatusText] = useState<{ text: string; isError: boolean } | null>(null);
+  const [userInitial, setUserInitial] = useState<string>("?");
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const email = data.session?.user?.email;
+      if (email) setUserInitial(email.charAt(0).toUpperCase());
+    });
+  }, []);
 
   const activeRole = pathname.startsWith("/manager")
     ? "mgr"
@@ -190,7 +199,7 @@ export default function Topbar() {
           style={{ background: "var(--clay-soft)", color: "var(--clay)" }}
           title="Account menu"
         >
-          PR
+          {userInitial}
         </button>
 
         {menuOpen && (

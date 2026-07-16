@@ -286,17 +286,17 @@ export default function IndividualDeveloperPage() {
         </div>
       </div>
 
-      {/* Recent PRs */}
-      <div className="mb-8">
-        <PRHeatMap prs={stats.recent_prs} />
-      </div>
-
       {/* Coaching history */}
       <div className="mb-8">
         <CoachingHistory
           cards={[]} // TODO: Fetch coaching cards from API
           breakdown={stats.coaching.breakdown}
         />
+      </div>
+
+      {/* Recent PRs */}
+      <div className="mb-8">
+        <PRHeatMap prs={stats.recent_prs} />
       </div>
 
       {/* Manager notes (Phase 6.3) */}

@@ -182,7 +182,7 @@ export default function ManagerTeamPage() {
 
       {/* PR Details Accordion */}
       <div
-        className="rounded-[14px] overflow-hidden"
+        className="rounded-[14px] overflow-hidden mt-8"
         style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}
       >
         <button

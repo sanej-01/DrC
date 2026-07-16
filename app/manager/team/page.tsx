@@ -178,8 +178,7 @@ export default function ManagerTeamPage() {
         </div>
       )}
 
-      {/* Spacer + divider to visually separate the garden from PR Details */}
-      <div className="mt-16 pt-8 border-t border-gray-200" />
+      <div className="mt-8 border-t border-gray-200" />
 
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">PR Details</h2>

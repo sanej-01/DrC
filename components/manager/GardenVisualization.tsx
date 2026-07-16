@@ -71,7 +71,7 @@ function getStageConfig(stage: string) {
       return {
         emoji: '🌱',
         label: 'Seedling',
-        description: 'Building (< 40 or low confidence)',
+        description: 'Building (< 40 score, or fewer than 3 PRs scored)',
         color: 'from-blue-100 to-blue-50',
         border: 'border-blue-300',
         badge: 'bg-blue-100 text-blue-800',

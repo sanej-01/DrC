@@ -196,18 +196,6 @@ export default function Topbar() {
         })}
       </div>
 
-      {/* Bell */}
-      <button
-        className="w-[36px] h-[36px] rounded-[10px] border text-base cursor-pointer"
-        style={{
-          border: "1px solid var(--line)",
-          background: "#fff",
-          color: "var(--ink-2)",
-        }}
-      >
-        🔔
-      </button>
-
       {/* Avatar + dropdown */}
       <div className="relative" ref={menuRef}>
         <button

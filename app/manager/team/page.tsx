@@ -48,6 +48,7 @@ export default function ManagerTeamPage() {
   const [includeZeroPR, setIncludeZeroPR] = useState(false);
   const [prDetailsRefreshKey, setPrDetailsRefreshKey] = useState(0);
   const [hasPrData, setHasPrData] = useState<boolean | null>(null);
+  const [prDetailsOpen, setPrDetailsOpen] = useState(false);
 
   // Initial value + live updates for the "Show members with no PRs"
   // toggle, which now lives in the Topbar account menu instead of on
@@ -181,13 +182,43 @@ export default function ManagerTeamPage() {
 
       <div className="mt-8 border-t border-gray-200" />
 
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">PR Details</h2>
-        <PRDetailsList
-          workspaceId={workspaceId}
-          refreshKey={prDetailsRefreshKey}
-          onDataLoaded={(count) => setHasPrData(count > 0)}
-        />
+      {/* PR Details Accordion */}
+      <div
+        className="rounded-[14px] overflow-hidden"
+        style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}
+      >
+        <button
+          onClick={() => setPrDetailsOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-4"
+          style={{ background: 'var(--surface)' }}
+        >
+          <span className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+            PR Details
+          </span>
+          <span
+            className="text-[16px] transition-transform duration-200"
+            style={{
+              color: 'var(--ink-3)',
+              display: 'inline-block',
+              transform: prDetailsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            }}
+          >
+            ▾
+          </span>
+        </button>
+
+        {prDetailsOpen && (
+          <div
+            className="px-5 pb-5"
+            style={{ borderTop: '1px solid var(--line)' }}
+          >
+            <PRDetailsList
+              workspaceId={workspaceId}
+              refreshKey={prDetailsRefreshKey}
+              onDataLoaded={(count) => setHasPrData(count > 0)}
+            />
+          </div>
+        )}
       </div>
 
       <div className="mt-8">

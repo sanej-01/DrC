@@ -61,6 +61,14 @@ export default function ManagerTeamPage() {
   }, []);
 
   useEffect(() => {
+    // Guards against toggling the checkbox faster than a request
+    // round-trip: without this, an in-flight request for the *previous*
+    // includeZeroPR value can resolve after the latest one and overwrite
+    // state with stale results (e.g. a late "checked" response landing
+    // after the "unchecked" one, showing no-data members despite the
+    // checkbox displaying unchecked).
+    let cancelled = false;
+
     const fetchTeamStats = async () => {
       try {
         setLoading(true);
@@ -72,7 +80,7 @@ export default function ManagerTeamPage() {
         ).get('workspace_id');
 
         if (!workspaceId) {
-          setError('No workspace selected');
+          if (!cancelled) setError('No workspace selected');
           return;
         }
 
@@ -88,18 +96,24 @@ export default function ManagerTeamPage() {
         }
 
         const data = await response.json();
+        if (cancelled) return;
         setMembers(data.members);
         setStats(data.stats);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to load team stats'
-        );
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : 'Failed to load team stats'
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchTeamStats();
+    return () => {
+      cancelled = true;
+    };
   }, [includeZeroPR]);
 
   if (loading) {

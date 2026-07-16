@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
 import { ManualScanButton } from '@/components/manager/ManualScanButton';
 import { PRDetailsList } from '@/components/manager/PRDetailsList';
+import ScoringChecklistAccordion from '@/components/manager/ScoringChecklistAccordion';
 import { authedFetch } from '@/lib/authed-fetch';
 
 interface TeamMember {
@@ -187,6 +188,10 @@ export default function ManagerTeamPage() {
           refreshKey={prDetailsRefreshKey}
           onDataLoaded={(count) => setHasPrData(count > 0)}
         />
+      </div>
+
+      <div className="mt-8">
+        <ScoringChecklistAccordion />
       </div>
     </div>
   );

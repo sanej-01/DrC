@@ -165,125 +165,83 @@ export default function GardenVisualization({
         </div>
       </div>
 
-      {/* Garden Grid */}
-      <div className="space-y-8">
-        {(['flourishing', 'mature', 'sapling', 'seedling', 'no_data'] as const).map((stage) => {
+      {/* Garden Grid — all members in one flat grid, ordered by stage */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {(['flourishing', 'mature', 'sapling', 'seedling', 'no_data'] as const).flatMap((stage) => {
           const stageMembers = membersByStage[stage];
-          if (stageMembers.length === 0) return null;
-
+          if (stageMembers.length === 0) return [];
           const config = getStageConfig(stage);
 
-          return (
-            <div key={stage}>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-3xl">{config.emoji}</span>
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    {config.label} ({stageMembers.length})
-                  </h3>
-                </div>
+          return stageMembers.map((member) => (
+            <div
+              key={member.id}
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                router.push(`/manager/team/${member.id}?workspace_id=${workspaceId}`)
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  router.push(`/manager/team/${member.id}?workspace_id=${workspaceId}`);
+                }
+              }}
+              className={`rounded-lg border ${config.border} bg-gradient-to-br ${config.color} p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
+            >
+              {/* Stage label */}
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="text-base">{config.emoji}</span>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${config.badge}`}>
+                  {config.label}
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {stageMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() =>
-                      router.push(`/manager/team/${member.id}?workspace_id=${workspaceId}`)
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        router.push(`/manager/team/${member.id}?workspace_id=${workspaceId}`);
-                      }
-                    }}
-                    className={`rounded-lg border ${config.border} bg-gradient-to-br ${config.color} p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
-                  >
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-900 truncate">
-                          {member.display_name}
-                        </h4>
-                        <p className="text-xs text-gray-600 truncate">
-                          {member.github_handle && `@${member.github_handle}`}
-                        </p>
-                      </div>
-                      {member.score_30d !== null && (
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-2xl font-bold text-gray-900">
-                            {member.score_30d}%
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Stats */}
-                    {member.stage !== 'no_data' && (
-                      <div className="space-y-2 mb-4 pt-3 pb-4 border-t border-gray-200/50">
-                        <div className="text-xs text-gray-700">
-                          <div className="flex justify-between">
-                            <span>Quality</span>
-                            <span className="font-semibold">
-                              {member.dimensions.quality !== null
-                                ? Math.round(member.dimensions.quality)
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-700">
-                          <div className="flex justify-between">
-                            <span>Risk</span>
-                            <span className="font-semibold">
-                              {member.dimensions.bug_risk !== null
-                                ? Math.round(100 - member.dimensions.bug_risk)
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-700">
-                          <div className="flex justify-between">
-                            <span>Architecture</span>
-                            <span className="font-semibold">
-                              {member.dimensions.architecture !== null
-                                ? Math.round(member.dimensions.architecture)
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-700">
-                          <div className="flex justify-between">
-                            <span>Tests</span>
-                            <span className="font-semibold">
-                              {member.dimensions.tests !== null
-                                ? Math.round(member.dimensions.tests)
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-200/50 text-xs text-gray-600">
-                      <div>
-                        {member.pr_count > 0 ? (
-                          <span>{member.pr_count} PR{member.pr_count !== 1 ? 's' : ''}</span>
-                        ) : (
-                          <span>No PRs</span>
-                        )}
-                      </div>
-                      <span className={`px-2 py-1 rounded ${config.badge}`}>
-                        {member.confidence === 'CONFIDENT' ? '✓' : ''}
-                        {member.confidence === 'LOW_CONFIDENCE' ? '⚠️' : ''}
-                      </span>
+              {/* Header */}
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-gray-900 truncate">
+                    {member.display_name}
+                  </h4>
+                  <p className="text-xs text-gray-600 truncate">
+                    {member.github_handle && `@${member.github_handle}`}
+                  </p>
+                </div>
+                {member.score_30d !== null && (
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {member.score_30d}%
                     </div>
                   </div>
-                ))}
+                )}
+              </div>
+
+              {/* Stats */}
+              {member.stage !== 'no_data' && (
+                <div className="space-y-2 mb-4 pt-3 pb-4 border-t border-gray-200/50">
+                  {([
+                    ['Quality', member.dimensions.quality],
+                    ['Risk', member.dimensions.bug_risk !== null ? 100 - member.dimensions.bug_risk : null],
+                    ['Architecture', member.dimensions.architecture],
+                    ['Tests', member.dimensions.tests],
+                  ] as [string, number | null][]).map(([label, val]) => (
+                    <div key={label} className="text-xs text-gray-700">
+                      <div className="flex justify-between">
+                        <span>{label}</span>
+                        <span className="font-semibold">{val !== null ? Math.round(val) : '—'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-3 border-t border-gray-200/50 text-xs text-gray-600">
+                <span>{member.pr_count > 0 ? `${member.pr_count} PR${member.pr_count !== 1 ? 's' : ''}` : 'No PRs'}</span>
+                <span className={`px-2 py-1 rounded ${config.badge}`}>
+                  {member.confidence === 'CONFIDENT' ? '✓' : '⚠️'}
+                </span>
               </div>
             </div>
-          );
+          ));
         })}
       </div>
     </div>

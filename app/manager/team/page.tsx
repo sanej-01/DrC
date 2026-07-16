@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import GardenVisualization from '@/components/manager/GardenVisualization';
 import { ManualScanButton } from '@/components/manager/ManualScanButton';
 import { PRDetailsList } from '@/components/manager/PRDetailsList';
+import ProjectsView from '@/components/manager/ProjectsView';
 import ScoringChecklistAccordion from '@/components/manager/ScoringChecklistAccordion';
 import { authedFetch } from '@/lib/authed-fetch';
 
@@ -49,6 +50,7 @@ export default function ManagerTeamPage() {
   const [prDetailsRefreshKey, setPrDetailsRefreshKey] = useState(0);
   const [hasPrData, setHasPrData] = useState<boolean | null>(null);
   const [prDetailsOpen, setPrDetailsOpen] = useState(false);
+  const [view, setView] = useState<'team' | 'projects'>('team');
 
   // Initial value + live updates for the "Show members with no PRs"
   // toggle, which now lives in the Topbar account menu instead of on
@@ -147,6 +149,56 @@ export default function ManagerTeamPage() {
 
   return (
     <div className="p-8">
+      {/* Team / Projects view toggle (prototype's left-nav pills) */}
+      <div
+        className="inline-flex gap-[3px] p-[3px] rounded-[12px] mb-6"
+        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+      >
+        {(['team', 'projects'] as const).map((v) => {
+          const isActive = view === v;
+          return (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className="border-0 text-[14px] font-medium px-4 py-[7px] rounded-[9px] transition-all cursor-pointer"
+              style={{
+                background: isActive ? 'var(--sage)' : 'transparent',
+                color: isActive ? '#fff' : 'var(--ink-2)',
+                fontWeight: isActive ? 600 : 500,
+              }}
+            >
+              {v === 'team' ? 'Team' : 'Projects'}
+            </button>
+          );
+        })}
+      </div>
+
+      {view === 'projects' ? (
+        <>
+          <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Projects</h1>
+              <p className="text-gray-600">
+                Quality rolled up per project, across all contributors
+              </p>
+            </div>
+            <button
+              onClick={() => setView('team')}
+              className="text-[13px] font-medium px-4 py-2 rounded-[10px] cursor-pointer flex-shrink-0"
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--line)',
+                color: 'var(--ink-2)',
+                boxShadow: 'var(--shadow)',
+              }}
+            >
+              View by people
+            </button>
+          </div>
+          <ProjectsView workspaceId={workspaceId} />
+        </>
+      ) : (
+        <>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">🌱 Team Garden</h1>
         <p className="text-gray-600">
@@ -224,6 +276,8 @@ export default function ManagerTeamPage() {
       <div className="mt-8">
         <ScoringChecklistAccordion />
       </div>
+        </>
+      )}
     </div>
   );
 }

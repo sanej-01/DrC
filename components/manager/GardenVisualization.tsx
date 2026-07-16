@@ -165,9 +165,9 @@ export default function GardenVisualization({
         </div>
       </div>
 
-      {/* Developers */}
+      {/* Team */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Developers</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Team</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {(['flourishing', 'mature', 'sapling', 'seedling', 'no_data'] as const).flatMap((stage) => {
           const stageMembers = membersByStage[stage];

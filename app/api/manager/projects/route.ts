@@ -125,25 +125,28 @@ export async function GET(request: NextRequest) {
       const trend = Array.from({ length: 6 }, (_, i) => {
         const bucketEnd = now - (5 - i) * 15 * DAY_MS;
         const bucketStart = bucketEnd - 15 * DAY_MS;
-        const inBucket = prs
+        // All merged PRs in this bucket (activity signal, scored or not)
+        const allInBucket = prs.filter((pr) =>
+          pr.repo_id === repo.id &&
+          !!pr.merged_at &&
+          new Date(pr.merged_at).getTime() > bucketStart &&
+          new Date(pr.merged_at).getTime() <= bucketEnd
+        );
+
+        const scoredInBucket = allInBucket
           .map((pr) => ({
             pr,
             score: Array.isArray(pr.pr_scores) ? pr.pr_scores[0] : pr.pr_scores,
           }))
-          .filter(
-            (r): r is { pr: PrRow; score: ScoreRow } =>
-              !!r.score &&
-              r.pr.repo_id === repo.id &&
-              !!r.pr.merged_at &&
-              new Date(r.pr.merged_at!).getTime() > bucketStart &&
-              new Date(r.pr.merged_at!).getTime() <= bucketEnd
-          );
-        const q = avg(inBucket.map((r) => overallOf(r.score)));
-        const br = avg(inBucket.map((r) => r.score.bug_risk || 0));
+          .filter((r): r is { pr: PrRow; score: ScoreRow } => !!r.score);
+
+        const q = avg(scoredInBucket.map((r) => overallOf(r.score)));
+        const br = avg(scoredInBucket.map((r) => r.score.bug_risk || 0));
         return {
           label: `R${i + 1}`,
           quality: q !== null ? Math.round(q) : null,
           bug_risk: br !== null ? Math.round(br) : null,
+          total_prs: allInBucket.length,
         };
       });
 

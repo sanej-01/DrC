@@ -15,6 +15,7 @@ interface TrendPoint {
   label: string;
   quality: number | null;
   bug_risk: number | null;
+  total_prs?: number;
 }
 
 interface Project {
@@ -60,10 +61,14 @@ function ReleaseChart({ trend }: { trend: TrendPoint[] }) {
     PAD.left + (trend.length > 1 ? (i / (trend.length - 1)) * innerW : innerW / 2);
   const y = (v: number) => PAD.top + innerH - (Math.max(0, Math.min(100, v)) / 100) * innerH;
 
-  const lineFor = (key: 'quality' | 'bug_risk') => {
-    const pts = trend
+  // All non-null points for a key — no minimum count requirement
+  const ptsFor = (key: 'quality' | 'bug_risk') =>
+    trend
       .map((p, i) => ({ v: p[key], i }))
       .filter((p): p is { v: number; i: number } => p.v !== null);
+
+  // SVG path string for 2+ points; null for 0–1 (single points render as dots)
+  const pathFor = (pts: { v: number; i: number }[]) => {
     if (pts.length < 2) return null;
     return pts
       .map((p, idx) => `${idx === 0 ? 'M' : 'L'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`)
@@ -71,80 +76,97 @@ function ReleaseChart({ trend }: { trend: TrendPoint[] }) {
   };
 
   const series: { key: 'quality' | 'bug_risk'; label: string; color: string }[] = [
-    { key: 'quality', label: 'quality', color: 'var(--sage)' },
+    { key: 'quality',  label: 'quality',                  color: 'var(--sage)' },
     { key: 'bug_risk', label: 'bug-risk (lower is better)', color: 'var(--clay)' },
   ];
 
-  const hasAnyLine = series.some((s) => lineFor(s.key) !== null);
+  const hasScoredData = series.some((s) => ptsFor(s.key).length >= 1);
+
+  // Stopgap: normalize total_prs per bucket to 0–100 when scored data is sparse
+  const maxPRs = Math.max(...trend.map((p) => p.total_prs || 0));
+  const activityPts = maxPRs > 0
+    ? trend
+        .map((p, i) => ({ v: Math.round(((p.total_prs || 0) / maxPRs) * 100), i }))
+        .filter((p) => p.v > 0)
+    : [];
+  const showStopgap = !hasScoredData && activityPts.length >= 1;
+  const noData = !hasScoredData && activityPts.length === 0;
 
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 320 }}>
+        {/* Gridlines */}
         {[25, 50, 75].map((v) => (
-          <line
-            key={v}
-            x1={PAD.left}
-            x2={W - PAD.right}
-            y1={y(v)}
-            y2={y(v)}
-            stroke="var(--line)"
-            strokeWidth="1"
-          />
+          <line key={v} x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)}
+            stroke="var(--line)" strokeWidth="1" />
         ))}
-        <line
-          x1={PAD.left}
-          x2={W - PAD.right}
-          y1={y(0)}
-          y2={y(0)}
-          stroke="var(--line-2)"
-          strokeWidth="1"
-        />
-        {series.map((s) => {
-          const d = lineFor(s.key);
-          if (!d) return null;
+        <line x1={PAD.left} x2={W - PAD.right} y1={y(0)} y2={y(0)}
+          stroke="var(--line-2)" strokeWidth="1" />
+
+        {/* Scored series — line + dots; larger dots for single-point series */}
+        {!showStopgap && series.map((s) => {
+          const pts = ptsFor(s.key);
+          if (pts.length === 0) return null;
+          const d = pathFor(pts);
           return (
             <g key={s.key}>
-              <path d={d} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" />
-              {trend.map((p, i) =>
-                p[s.key] !== null ? (
-                  <circle key={i} cx={x(i)} cy={y(p[s.key]!)} r="4" fill={s.color} />
-                ) : null
-              )}
+              {d && <path d={d} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" />}
+              {pts.map((p) => (
+                <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={d ? 4 : 6} fill={s.color} />
+              ))}
             </g>
           );
         })}
+
+        {/* Stopgap: PR activity dashed line when no scored PRs */}
+        {showStopgap && (() => {
+          const d = pathFor(activityPts);
+          return (
+            <g>
+              {d && (
+                <path d={d} fill="none" stroke="var(--ink-3)" strokeWidth="2"
+                  strokeDasharray="8 4" strokeLinecap="round" />
+              )}
+              {activityPts.map((p) => (
+                <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={d ? 4 : 6} fill="var(--ink-3)" />
+              ))}
+            </g>
+          );
+        })()}
+
+        {/* X-axis labels */}
         {trend.map((p, i) => (
-          <text
-            key={i}
-            x={x(i)}
-            y={H - 10}
-            textAnchor="middle"
-            fontSize="13"
-            fill="var(--ink-3)"
-          >
+          <text key={i} x={x(i)} y={H - 10} textAnchor="middle" fontSize="13" fill="var(--ink-3)">
             {p.label}
           </text>
         ))}
-        {!hasAnyLine && (
+
+        {noData && (
           <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="14" fill="var(--ink-3)">
-            Not enough scored PRs yet to draw a release trend
+            No PR activity yet — run a scan to populate this chart
           </text>
         )}
       </svg>
+
+      {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 mt-2">
-        {series.map((s) => (
-          <span
-            key={s.key}
-            className="inline-flex items-center gap-1.5 text-[12px]"
-            style={{ color: 'var(--ink-2)' }}
-          >
-            <i
-              className="inline-block w-2.5 h-2.5 rounded-full not-italic"
-              style={{ background: s.color }}
-            />
-            {s.label}
+        {showStopgap ? (
+          <span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--ink-3)' }}>
+            <svg width="16" height="4" style={{ display: 'inline', verticalAlign: 'middle' }}>
+              <line x1="0" y1="2" x2="16" y2="2" stroke="var(--ink-3)" strokeWidth="2" strokeDasharray="5 3" />
+            </svg>
+            PR activity · scoring in progress
           </span>
-        ))}
+        ) : (
+          series.map((s) => (
+            <span key={s.key} className="inline-flex items-center gap-1.5 text-[12px]"
+              style={{ color: 'var(--ink-2)' }}>
+              <i className="inline-block w-2.5 h-2.5 rounded-full not-italic"
+                style={{ background: s.color }} />
+              {s.label}
+            </span>
+          ))
+        )}
       </div>
     </div>
   );

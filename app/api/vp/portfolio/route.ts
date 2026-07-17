@@ -274,6 +274,7 @@ export async function GET(request: NextRequest) {
           inBucket.length > 0
             ? Math.round((scored.length / inBucket.length) * 100)
             : null,
+        total_prs: inBucket.length,
       };
     });
 

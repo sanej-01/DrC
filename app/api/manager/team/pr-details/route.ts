@@ -16,13 +16,21 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
 
-    const { data: prs, error: prsError } = await supabase
-      .from("pull_requests")
-      .select(
-        "id, number, title, url, author_github_handle, developer_id, merged_at, additions_count, deletions_count, files_changed_count, pr_scores(code_quality, bug_risk, architecture, test_coverage, overall_score, overall_assessment, feedback, scored_at)"
-      )
-      .eq("workspace_id", workspaceId)
-      .order("merged_at", { ascending: false });
+    const [{ data: prs, error: prsError }, { data: repoList }] =
+      await Promise.all([
+        supabase
+          .from("pull_requests")
+          .select(
+            "id, number, title, url, author_github_handle, developer_id, merged_at, additions_count, deletions_count, files_changed_count, repo_id, pr_scores(code_quality, bug_risk, architecture, test_coverage, overall_score, overall_assessment, feedback, scored_at)"
+          )
+          .eq("workspace_id", workspaceId)
+          .order("merged_at", { ascending: false }),
+        supabase
+          .from("repos")
+          .select("id, name")
+          .eq("workspace_id", workspaceId)
+          .eq("is_active", true),
+      ]);
 
     if (prsError) {
       return NextResponse.json(
@@ -30,6 +38,11 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    const repoNameMap: Record<string, string> = {};
+    (repoList || []).forEach((repo: { id: string; name: string }) => {
+      repoNameMap[repo.id] = repo.name;
+    });
 
     // Author display info for PRs linked to a real developer account
     const developerIds = (prs || [])
@@ -71,6 +84,7 @@ export async function GET(request: NextRequest) {
         additions_count: pr.additions_count,
         deletions_count: pr.deletions_count,
         files_changed_count: pr.files_changed_count,
+        repo_name: pr.repo_id ? (repoNameMap[pr.repo_id] ?? null) : null,
         score: score
           ? {
               code_quality: score.code_quality,

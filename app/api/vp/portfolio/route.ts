@@ -4,14 +4,10 @@ import { withManagerAuth } from "@/lib/api-middleware";
 /**
  * GET /api/vp/portfolio?workspace_id=...
  *
- * Director/VP portfolio, rewritten against the live schema. The original
- * version queried team_aggregates / early_warnings / workspace_snapshots,
- * none of which exist in the live DB (same nonexistent-tables issue the
- * dashboard and individual-stats routes had). There is no separate
- * "teams" concept live either, so each workspace the signed-in user
- * manages is treated as a team: aggregates are computed on the fly from
- * pull_requests + pr_scores, warnings are derived heuristics, and the
- * trend is 6 fifteen-day buckets over the last 90 days.
+ * Director/VP portfolio. Each active repo the signed-in user's workspaces
+ * contain is shown as a "team" row — matching the Projects tab on the
+ * manager page. Previously grouped by workspace, which collapsed multiple
+ * repos in one workspace into a single row.
  */
 
 interface ScoreRow {
@@ -26,6 +22,8 @@ interface PrRow {
   id: string;
   merged_at: string | null;
   developer_id: string | null;
+  repo_id: string | null;
+  workspace_id: string;
   pr_scores: ScoreRow[] | ScoreRow | null;
 }
 
@@ -54,7 +52,7 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
 
-    // Every workspace this user manages is a "team" in the portfolio
+    // Workspaces this user manages
     const { data: memberships, error: memberError } = await supabase
       .from("workspace_members")
       .select("workspace_id, role")
@@ -70,9 +68,8 @@ export async function GET(request: NextRequest) {
 
     const workspaceIds = memberships.map((m) => m.workspace_id);
 
-    const [{ data: workspaces }, { data: members }, { data: prList }] =
+    const [{ data: members }, { data: prList }, { data: repoList }] =
       await Promise.all([
-        supabase.from("workspaces").select("id, name").in("id", workspaceIds),
         supabase
           .from("workspace_members")
           .select("workspace_id, user_id, role")
@@ -80,39 +77,58 @@ export async function GET(request: NextRequest) {
         supabase
           .from("pull_requests")
           .select(
-            `id, workspace_id, merged_at, developer_id,
+            `id, workspace_id, merged_at, developer_id, repo_id,
              pr_scores(code_quality, bug_risk, architecture, test_coverage, feedback)`
           )
           .in("workspace_id", workspaceIds)
           .not("merged_at", "is", null)
           .order("merged_at", { ascending: false })
           .limit(500),
+        supabase
+          .from("repos")
+          .select("id, name, workspace_id")
+          .in("workspace_id", workspaceIds)
+          .eq("is_active", true)
+          .order("created_at", { ascending: true }),
       ]);
 
     const now = Date.now();
-    const nameOf = new Map((workspaces || []).map((w) => [w.id, w.name]));
+    const prs = (prList || []) as unknown as PrRow[];
 
-    type WsPr = PrRow & { workspace_id: string };
-    const prs = (prList || []) as unknown as WsPr[];
-
-    const scoredOf = (wsId: string | null, days: number) =>
+    // scored PRs for a given repo and time window
+    const scoredFor = (repoId: string, days: number) =>
       prs
         .map((pr) => ({
           pr,
           score: Array.isArray(pr.pr_scores) ? pr.pr_scores[0] : pr.pr_scores,
         }))
         .filter(
-          (r): r is { pr: WsPr; score: ScoreRow } =>
+          (r): r is { pr: PrRow; score: ScoreRow } =>
             !!r.score &&
-            (wsId === null || r.pr.workspace_id === wsId) &&
+            r.pr.repo_id === repoId &&
             !!r.pr.merged_at &&
             now - new Date(r.pr.merged_at).getTime() <= days * DAY_MS
         );
 
-    // ---- Per-team aggregates ----
-    const teams = workspaceIds.map((wsId) => {
-      const s30 = scoredOf(wsId, 30).map((r) => r.score);
-      const s90 = scoredOf(wsId, 90).map((r) => r.score);
+    // All scored PRs across all repos (for org KPIs)
+    const scoredAll = (days: number) =>
+      prs
+        .map((pr) => ({
+          pr,
+          score: Array.isArray(pr.pr_scores) ? pr.pr_scores[0] : pr.pr_scores,
+        }))
+        .filter(
+          (r): r is { pr: PrRow; score: ScoreRow } =>
+            !!r.score &&
+            !!r.pr.merged_at &&
+            now - new Date(r.pr.merged_at).getTime() <= days * DAY_MS
+        );
+
+    // ---- Per-repo teams ----
+    const repos = repoList || [];
+    const teams = repos.map((repo) => {
+      const s30 = scoredFor(repo.id, 30).map((r) => r.score);
+      const s90 = scoredFor(repo.id, 90).map((r) => r.score);
       const q30 = avg(s30.map(overallOf));
       const q90 = avg(s90.map(overallOf));
 
@@ -122,13 +138,16 @@ export async function GET(request: NextRequest) {
         momentum = diff > 3 ? "improving" : diff < -3 ? "watch" : "steady";
       }
 
-      const devCount = (members || []).filter(
-        (m) => m.workspace_id === wsId && m.role === "developer"
-      ).length;
+      // Developer count = unique developer_ids who have PRs in this repo
+      const devCount = new Set(
+        prs
+          .filter((pr) => pr.repo_id === repo.id && pr.developer_id)
+          .map((pr) => pr.developer_id)
+      ).size;
 
       return {
-        workspace_id: wsId,
-        name: nameOf.get(wsId) || wsId,
+        workspace_id: repo.workspace_id,
+        name: repo.name,
         quality: q30 !== null ? Math.round(q30) : null,
         bug_risk:
           s30.length > 0
@@ -145,15 +164,16 @@ export async function GET(request: NextRequest) {
     });
 
     // ---- Org KPIs ----
-    const org30 = scoredOf(null, 30).map((r) => r.score);
-    const org90All = scoredOf(null, 90);
+    const org30 = scoredAll(30);
+    const org90All = scoredAll(90);
     const merged90 = prs.filter(
       (pr) =>
         pr.merged_at && now - new Date(pr.merged_at).getTime() <= 90 * DAY_MS
     );
 
-    const orgQuality = avg(org30.map(overallOf));
+    const orgQuality = avg(org30.map((r) => overallOf(r.score)));
     const orgQuality90 = avg(org90All.map((r) => overallOf(r.score)));
+
     const kpis = {
       org_quality: orgQuality !== null ? Math.round(orgQuality) : null,
       org_quality_delta:
@@ -162,7 +182,7 @@ export async function GET(request: NextRequest) {
           : null,
       bug_risk:
         org30.length > 0
-          ? Math.round(avg(org30.map((s) => s.bug_risk || 0))!)
+          ? Math.round(avg(org30.map((r) => r.score.bug_risk || 0))!)
           : null,
       coaching_coverage:
         merged90.length > 0
@@ -176,7 +196,7 @@ export async function GET(request: NextRequest) {
         .length,
     };
 
-    // ---- Early warnings (derived heuristics) ----
+    // ---- Early warnings (derived heuristics, per repo) ----
     const warnings: {
       icon: string;
       severity: "warning" | "info" | "win";
@@ -186,7 +206,9 @@ export async function GET(request: NextRequest) {
     }[] = [];
 
     for (const t of teams) {
-      const s90 = scoredOf(t.workspace_id, 90).map((r) => r.score);
+      const repo = repos.find((r) => r.name === t.name);
+      if (!repo) continue;
+      const s90 = scoredFor(repo.id, 90).map((r) => r.score);
       const q90 = avg(s90.map(overallOf));
       if (t.quality !== null && q90 !== null && t.quality < q90 - 5) {
         warnings.push({
@@ -226,7 +248,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ---- Trend: 6 x 15-day buckets over last 90 days ----
+    // ---- Trend: 6 x 15-day buckets over last 90 days (org-wide) ----
     const trend = Array.from({ length: 6 }, (_, i) => {
       const bucketEnd = now - (5 - i) * 15 * DAY_MS;
       const bucketStart = bucketEnd - 15 * DAY_MS;
@@ -262,9 +284,7 @@ export async function GET(request: NextRequest) {
     let improving = 0;
     for (const dev of devIds) {
       const d30 = avg(
-        scoredOf(null, 30)
-          .filter((r) => r.pr.developer_id === dev)
-          .map((r) => overallOf(r.score))
+        org30.filter((r) => r.pr.developer_id === dev).map((r) => overallOf(r.score))
       );
       const d90 = avg(
         org90All

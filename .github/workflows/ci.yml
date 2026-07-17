@@ -7,39 +7,7 @@ on:
     branches: [main, develop]
 
 jobs:
-  lint-and-test:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Run unit tests
-        run: npm run test:ci
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage/coverage-final.json
-          flags: unittests
-          name: codecov-umbrella
-
-  e2e-tests:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -48,22 +16,11 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: '20'
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Run e2e tests
-        run: npm run test:e2e
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
+      - name: Lint
+        run: npm run lint

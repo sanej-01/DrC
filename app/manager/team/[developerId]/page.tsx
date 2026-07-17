@@ -12,6 +12,7 @@ interface ReviewDetail {
   pr_title: string;
   merged_at: string;
   overall_score: number;
+  repo_name?: string | null;
   dimensions: {
     code_quality: number | null;
     bug_risk: number | null;

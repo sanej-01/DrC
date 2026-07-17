@@ -25,6 +25,7 @@ interface PrRow {
   number: number;
   title: string;
   merged_at: string;
+  repo_id?: string | null;
   pr_scores: ScoreRow[] | ScoreRow | null;
 }
 
@@ -107,21 +108,23 @@ export async function GET(
 
     const { data: authUser } = await supabase.auth.admin.getUserById(developerId);
 
-    const { data: pullRequests, error: prError } = await supabase
-      .from("pull_requests")
-      .select(
-        `
-        id,
-        number,
-        title,
-        merged_at,
-        pr_scores (code_quality, bug_risk, architecture, test_coverage, feedback)
-      `
-      )
-      .eq("workspace_id", workspaceId)
-      .eq("developer_id", developerId)
-      .order("merged_at", { ascending: false })
-      .limit(50);
+    const [{ data: pullRequests, error: prError }, { data: repoList }] = await Promise.all([
+      supabase
+        .from("pull_requests")
+        .select(
+          `id, number, title, merged_at, repo_id,
+          pr_scores (code_quality, bug_risk, architecture, test_coverage, feedback, overall_assessment)`
+        )
+        .eq("workspace_id", workspaceId)
+        .eq("developer_id", developerId)
+        .order("merged_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("repos")
+        .select("id, name")
+        .eq("workspace_id", workspaceId)
+        .eq("is_active", true),
+    ]);
 
     if (prError) {
       return NextResponse.json(
@@ -129,6 +132,11 @@ export async function GET(
         { status: 500 }
       );
     }
+
+    const repoNameMap: Record<string, string> = {};
+    (repoList || []).forEach((repo: { id: string; name: string }) => {
+      repoNameMap[repo.id] = repo.name;
+    });
 
     const rows = (pullRequests || []) as unknown as PrRow[];
     const now = Date.now();
@@ -269,6 +277,7 @@ export async function GET(
           architecture: score.architecture,
           tests: score.test_coverage,
         }),
+        repo_name: pr.repo_id ? (repoNameMap[pr.repo_id] ?? null) : null,
         dimensions: {
           code_quality: score.code_quality,
           bug_risk: score.bug_risk,

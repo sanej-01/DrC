@@ -32,6 +32,7 @@ interface ReviewDetail {
   pr_title: string;
   merged_at: string;
   overall_score: number;
+  repo_name?: string | null;
   dimensions: {
     code_quality: number | null;
     bug_risk: number | null;
@@ -54,6 +55,7 @@ interface PrRow {
   number: number;
   title: string;
   merged_at: string;
+  repo_id?: string | null;
   score?: ScoreRow;
 }
 
@@ -87,23 +89,36 @@ export default function DashboardPage() {
       const now = Date.now();
       const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const { data: prList } = await supabase
-        .from('pull_requests')
-        .select(`id, number, title, merged_at,
-          pr_scores(code_quality, bug_risk, architecture, test_coverage, overall_assessment, feedback)`)
-        .eq('workspace_id', membership.workspace_id)
-        .eq('developer_id', user.id)
-        .order('merged_at', { ascending: false })
-        .limit(30);
+      const [{ data: prList }, { data: repoList }] = await Promise.all([
+        supabase
+          .from('pull_requests')
+          .select(`id, number, title, merged_at, repo_id,
+            pr_scores(code_quality, bug_risk, architecture, test_coverage, overall_assessment, feedback)`)
+          .eq('workspace_id', membership.workspace_id)
+          .eq('developer_id', user.id)
+          .order('merged_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('repos')
+          .select('id, name')
+          .eq('workspace_id', membership.workspace_id)
+          .eq('is_active', true),
+      ]);
+
+      const repoNameMap: Record<string, string> = {};
+      (repoList || []).forEach((repo: { id: string; name: string }) => {
+        repoNameMap[repo.id] = repo.name;
+      });
 
       const prs: PrRow[] = (prList || []).map((pr: {
-        id: string; number: number; title: string; merged_at: string;
+        id: string; number: number; title: string; merged_at: string; repo_id?: string | null;
         pr_scores?: ScoreRow[];
       }) => ({
         id: pr.id,
         number: pr.number,
         title: pr.title,
         merged_at: pr.merged_at,
+        repo_id: pr.repo_id,
         score: pr.pr_scores?.[0],
       }));
 
@@ -191,6 +206,7 @@ export default function DashboardPage() {
         pr_title: pr.title,
         merged_at: pr.merged_at,
         overall_score: overallOfScore(pr.score),
+        repo_name: pr.repo_id ? (repoNameMap[pr.repo_id] ?? null) : null,
         dimensions: {
           code_quality: pr.score.code_quality,
           bug_risk: pr.score.bug_risk,

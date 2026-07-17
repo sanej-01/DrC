@@ -150,11 +150,17 @@ function ReleaseChart({ trend }: { trend: TrendPoint[] }) {
   );
 }
 
+const MAX_PROJECTS = 5;
+
 export default function ProjectsView({ workspaceId }: ProjectsViewProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [newRepo, setNewRepo] = useState('');
+  const [addStatus, setAddStatus] = useState<{ text: string; isError: boolean } | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,7 +179,11 @@ export default function ProjectsView({ workspaceId }: ProjectsViewProps) {
         const data = await response.json();
         if (cancelled) return;
         setProjects(data.projects);
-        setSelectedId(data.projects[0]?.repo_id ?? null);
+        setSelectedId((prev) =>
+          prev && data.projects.some((p: Project) => p.repo_id === prev)
+            ? prev
+            : data.projects[0]?.repo_id ?? null
+        );
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load projects');
@@ -187,7 +197,53 @@ export default function ProjectsView({ workspaceId }: ProjectsViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId]);
+  }, [workspaceId, refreshKey]);
+
+  const handleAdd = async () => {
+    if (!newRepo.trim()) return;
+    setAdding(true);
+    setAddStatus(null);
+    try {
+      const response = await authedFetch(`/api/manager/repos?workspace_id=${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: newRepo.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to connect project');
+      setAddStatus({
+        text: `${data.project.full_name} connected — run a scan to pull its PRs`,
+        isError: false,
+      });
+      setNewRepo('');
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setAddStatus({
+        text: err instanceof Error ? err.message : 'Failed to connect project',
+        isError: true,
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDisconnect = async (repoId: string, name: string) => {
+    if (!confirm(`Disconnect ${name}? Its PR history and scores are kept.`)) return;
+    try {
+      const response = await authedFetch(
+        `/api/manager/repos?workspace_id=${workspaceId}&repo_id=${repoId}`,
+        { method: 'DELETE' }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to disconnect');
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setAddStatus({
+        text: err instanceof Error ? err.message : 'Failed to disconnect',
+        isError: true,
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -207,18 +263,45 @@ export default function ProjectsView({ workspaceId }: ProjectsViewProps) {
     );
   }
 
-  if (projects.length === 0) {
-    return (
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-amber-800">
-        <p className="font-semibold">No connected projects</p>
-        <p className="text-sm mt-1">
-          Connect a repository and run a scan — each connected repo appears here as a project.
-        </p>
-      </div>
-    );
-  }
-
   const selected = projects.find((p) => p.repo_id === selectedId) || projects[0];
+
+  const addCard = projects.length < MAX_PROJECTS && (
+    <div
+      className="rounded-[14px] p-5 flex flex-col justify-center"
+      style={{ background: 'var(--surface-2)', border: '1px dashed var(--line-2)' }}
+    >
+      <div className="text-[13px] font-semibold mb-1" style={{ color: 'var(--ink)' }}>
+        {projects.length === 0 ? 'Connect a project' : 'Add a project (optional)'}
+      </div>
+      <div className="text-[12px] mb-3" style={{ color: 'var(--ink-3)' }}>
+        {projects.length} of {MAX_PROJECTS} connected · scores roll up across all projects
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newRepo}
+          onChange={(e) => setNewRepo(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !adding && handleAdd()}
+          placeholder="owner/repo"
+          className="flex-1 min-w-0 text-[13px] px-3 py-2 rounded-[8px] outline-none"
+          style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)' }}
+        />
+        <button
+          onClick={handleAdd}
+          disabled={adding || !newRepo.trim()}
+          className="text-[13px] font-medium px-4 py-2 rounded-[8px] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          style={{ background: 'var(--sage)', color: '#fff' }}
+        >
+          {adding ? 'Adding…' : 'Add'}
+        </button>
+      </div>
+      {addStatus && (
+        <p className="text-[12px] mt-2" style={{ color: addStatus.isError ? 'var(--bad)' : 'var(--good)' }}>
+          {addStatus.text}
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-8">
@@ -262,6 +345,19 @@ export default function ProjectsView({ workspaceId }: ProjectsViewProps) {
                 <span className="text-[12px] font-medium flex-shrink-0" style={{ color: m.color }}>
                   {m.arrow} {m.label}
                 </span>
+                {idx > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDisconnect(p.repo_id, p.full_name);
+                    }}
+                    className="flex-shrink-0 border-0 bg-transparent cursor-pointer text-[14px] leading-none px-1"
+                    style={{ color: 'var(--ink-3)' }}
+                    title={`Disconnect ${p.full_name}`}
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
               {/* Quality + open issues */}
@@ -300,27 +396,30 @@ export default function ProjectsView({ workspaceId }: ProjectsViewProps) {
             </div>
           );
         })}
+        {addCard}
       </div>
 
       {/* Release-over-release chart for the selected project */}
-      <div
-        className="rounded-[14px] p-6"
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--line)',
-          boxShadow: 'var(--shadow)',
-        }}
-      >
-        <h2
-          className="text-[11px] font-semibold uppercase"
-          style={{ color: 'var(--ink-3)', letterSpacing: '0.08em' }}
+      {selected && (
+        <div
+          className="rounded-[14px] p-6"
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--line)',
+            boxShadow: 'var(--shadow)',
+          }}
         >
-          Release-over-release quality · {selected.name}
-        </h2>
-        <div className="mt-4">
-          <ReleaseChart trend={selected.trend} />
+          <h2
+            className="text-[11px] font-semibold uppercase"
+            style={{ color: 'var(--ink-3)', letterSpacing: '0.08em' }}
+          >
+            Release-over-release quality · {selected.name}
+          </h2>
+          <div className="mt-4">
+            <ReleaseChart trend={selected.trend} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

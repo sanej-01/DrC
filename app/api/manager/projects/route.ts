@@ -64,7 +64,9 @@ export async function GET(request: NextRequest) {
           .from("repos")
           .select("id, name, full_name")
           .eq("workspace_id", workspaceId)
-          .eq("is_active", true),
+          .eq("is_active", true)
+          .order("created_at", { ascending: true })
+          .limit(5),
         supabase
           .from("pull_requests")
           .select(

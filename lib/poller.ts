@@ -516,20 +516,63 @@ export async function pollWorkspacePRs(
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // Get all repos in workspace
+    // Active repos only, oldest first so the first row is the primary
+    // project. A workspace supports up to 5 connected projects; the
+    // first is required, the rest optional.
     const { data: repos, error: reposError } = await supabase
       .from("repos")
       .select("*")
-      .eq("workspace_id", workspaceId);
+      .eq("workspace_id", workspaceId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(5);
 
     if (reposError || !repos) {
       console.error("Error fetching repos:", reposError);
       return [];
     }
 
+    const octokit = new Octokit({ auth: userGitHubToken });
+
     // Poll each repo
     const results: PollerResult[] = [];
-    for (const repo of repos) {
+    for (const [index, repo] of repos.entries()) {
+      // Refresh repo metadata from GitHub so renames propagate, and use
+      // the primary project's GitHub name as the workspace's team name.
+      try {
+        const { data: ghRepo } = await octokit.rest.repos.get({
+          owner: repo.owner,
+          repo: repo.name,
+        });
+        await supabase
+          .from("repos")
+          .update({
+            owner: ghRepo.owner.login,
+            name: ghRepo.name,
+            full_name: ghRepo.full_name,
+            description: ghRepo.description,
+            url: ghRepo.html_url,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", repo.id);
+        if (index === 0) {
+          await supabase
+            .from("workspaces")
+            .update({ name: ghRepo.name, updated_at: new Date().toISOString() })
+            .eq("id", workspaceId);
+        }
+        // Keep the loop variables current for the poll below
+        repo.owner = ghRepo.owner.login;
+        repo.name = ghRepo.name;
+      } catch (metaError) {
+        // Metadata refresh is best-effort; a rename/permissions hiccup
+        // shouldn't block PR polling with the stored coordinates.
+        console.warn(
+          `Could not refresh metadata for ${repo.owner}/${repo.name}:`,
+          extractErrorMessage(metaError)
+        );
+      }
+
       // pull_requests.repo_id, poller_metadata.repo_id, and
       // poller_job_log.repo_id all have foreign keys to repos(id) -
       // not repos.repo_id, which is a separate, unrelated GitHub-side

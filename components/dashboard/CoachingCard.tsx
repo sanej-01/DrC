@@ -237,25 +237,6 @@ function ResourcePopup({
           >
             Read the full article on {articleSource} ↗
           </a>
-
-          {/* Best-effort inline embed — many reputable sources block
-              framing, so the summary above and the link are always the
-              primary content and this simply enriches when allowed. */}
-          <div
-            className="mt-4 rounded-[10px] overflow-hidden"
-            style={{ border: '1px solid var(--line)', height: 320 }}
-          >
-            <iframe
-              src={article}
-              title={title}
-              className="w-full h-full"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <p className="text-[11px] mt-2" style={{ color: 'var(--ink-3)' }}>
-            If the preview stays blank, the source blocks embedding — use the link above to open it.
-          </p>
         </div>
       </div>
     </div>

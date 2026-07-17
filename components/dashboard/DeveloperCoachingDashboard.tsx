@@ -98,8 +98,7 @@ export default function DeveloperCoachingDashboard(props: DashboardProps) {
               Good to see you, {firstName} 🌱
             </h1>
             <p className="text-[15px] mt-1.5" style={{ color: 'var(--ink-2)' }}>
-              You&apos;re not being ranked — you&apos;re being coached. Here&apos;s what
-              your recent PRs say about how you&apos;re growing.
+              You&apos;re being coached. Your recent PRs show your growing.
             </p>
           </div>
           <div className="text-right flex-shrink-0">

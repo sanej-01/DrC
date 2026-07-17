@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withManagerAuth } from "@/lib/api-middleware";
+import { deriveCoachingItems } from "@/lib/coaching-derive";
 
 interface FeedbackItem {
   type: "GOOD" | "IMPROVE" | "FIX" | "SUGGEST";
@@ -226,27 +227,16 @@ export async function GET(
       )
       .slice(0, 3);
 
-    // Latest coaching: most recent scored PR's overall_assessment + lead feedback
-    const latestScored = withScores[0];
-    const latest_coaching = latestScored
-      ? (() => {
-          const fb = latestScored.score.feedback || [];
-          const lead = fb.find((f) => f.type !== "GOOD") || fb[0];
-          return {
-            pr_number: latestScored.pr.number,
-            pr_title: latestScored.pr.title,
-            headline:
-              (lead as any)?.title ||
-              (latestScored.score as any).overall_assessment ||
-              "Reviewed — nothing urgent flagged",
-            tag: (lead as any)?.dimension || null,
-            body:
-              (latestScored.score as any).overall_assessment ||
-              (lead as any)?.description ||
-              "No detailed notes for this PR.",
-          };
-        })()
-      : null;
+    // Coaching suggestions (≥2 when the feedback allows), preferring
+    // bug-risk then the other dimensions — shared with /dashboard.
+    const coaching_items = deriveCoachingItems(
+      withScores.map(({ pr, score }) => ({
+        pr_number: pr.number,
+        pr_title: pr.title,
+        overall_assessment: score.overall_assessment,
+        feedback: score.feedback || [],
+      }))
+    );
 
     return NextResponse.json({
       developer: {
@@ -268,7 +258,7 @@ export async function GET(
       },
       dimensions_30d,
       quest_items,
-      latest_coaching,
+      coaching_items,
       review_details: withScores.slice(0, 20).map(({ pr, score }) => ({
         pr_number: pr.number,
         pr_title: pr.title,

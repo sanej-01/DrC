@@ -162,22 +162,29 @@ export default function ManagerNoteEditor({
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="animate-pulse h-32 bg-gray-200 rounded"></div>
+      <div
+        className="rounded-[14px] p-6"
+        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+      >
+        <div className="animate-pulse h-32 rounded" style={{ background: 'var(--line)' }} />
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-purple-200 p-6">
+    <div
+      className="rounded-[14px] p-6"
+      style={{ background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow)' }}
+    >
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">
-          🔒 Private Manager Note
+        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+          🔒 Private manager note
         </h2>
         {note && !isEditing && (
           <button
             onClick={() => setIsEditing(true)}
-            className="text-sm font-medium text-blue-600 hover:text-blue-800"
+            className="text-[13px] font-medium cursor-pointer"
+            style={{ color: 'var(--sage-ink)' }}
           >
             Edit
           </button>
@@ -189,16 +196,19 @@ export default function ManagerNoteEditor({
         <>
           {note ? (
             <div className="space-y-4">
-              <div className="bg-gray-50 rounded p-4 border border-gray-200">
-                <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
+              <div
+                className="rounded-[10px] p-4"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+              >
+                <p className="whitespace-pre-wrap leading-relaxed text-[14px]" style={{ color: 'var(--ink)' }}>
                   {note.content}
                 </p>
               </div>
-              <div className="flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center justify-between text-[12px]" style={{ color: 'var(--ink-3)' }}>
                 <span>
                   {note.manager ? (
                     <>
-                      Updated by {note.manager.display_name} •{' '}
+                      Updated by {note.manager.display_name} ·{' '}
                       {formatTimestamp(note.updated_at)}
                     </>
                   ) : (
@@ -207,7 +217,8 @@ export default function ManagerNoteEditor({
                 </span>
                 <button
                   onClick={handleDelete}
-                  className="text-red-600 hover:text-red-800 font-medium"
+                  className="font-medium cursor-pointer disabled:opacity-50"
+                  style={{ color: 'var(--bad)' }}
                   disabled={isSaving}
                 >
                   Delete
@@ -216,12 +227,13 @@ export default function ManagerNoteEditor({
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">
+              <p className="mb-4 text-[14px]" style={{ color: 'var(--ink-2)' }}>
                 No private notes yet. Add one to track important observations.
               </p>
               <button
                 onClick={() => setIsEditing(true)}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded"
+                className="px-4 py-2 text-[13px] font-medium rounded-[10px] border-0 cursor-pointer"
+                style={{ background: 'var(--sage)', color: '#fff' }}
               >
                 Add Note
               </button>
@@ -238,28 +250,31 @@ export default function ManagerNoteEditor({
               setError(null);
             }}
             placeholder="Add private observations, 1-on-1 notes, coaching reminders, etc..."
-            className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            className="w-full h-32 p-3 rounded-[10px] resize-none outline-none text-[14px]"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink)' }}
             maxLength={5000}
           />
 
           <div className="flex items-center justify-between">
-            <div className="text-xs text-gray-600">
+            <div className="text-[12px]" style={{ color: 'var(--ink-3)' }}>
               {content.length} / 5000 characters
             </div>
-            {error && <div className="text-xs text-red-600">{error}</div>}
+            {error && <div className="text-[12px]" style={{ color: 'var(--bad)' }}>{error}</div>}
           </div>
 
           <div className="flex gap-3 justify-end">
             <button
               onClick={handleCancel}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 font-medium rounded"
+              className="px-4 py-2 text-[13px] font-medium rounded-[10px] cursor-pointer disabled:opacity-50"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink)' }}
               disabled={isSaving}
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded disabled:opacity-50"
+              className="px-4 py-2 text-[13px] font-medium rounded-[10px] border-0 cursor-pointer disabled:opacity-50"
+              style={{ background: 'var(--sage)', color: '#fff' }}
               disabled={isSaving || !content.trim()}
             >
               {isSaving ? 'Saving...' : 'Save Note'}

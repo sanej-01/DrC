@@ -3,8 +3,10 @@
 /**
  * Developer Coaching Dashboard — shared layout for /dashboard and
  * /manager/team/[developerId] drill-down. Same hero + dimensions +
- * quests + latest-coaching structure, different data sources.
+ * quests + coaching structure, different data sources.
  */
+
+import CoachingCard, { CoachingCardItem } from './CoachingCard';
 
 interface FeedbackItem {
   type: 'GOOD' | 'IMPROVE' | 'FIX' | 'SUGGEST';
@@ -36,13 +38,7 @@ interface DashboardProps {
     description: string;
     pr_number: number;
   }>;
-  latestCoaching: {
-    pr_number: number;
-    pr_title: string;
-    headline: string;
-    tag: string | null;
-    body: string;
-  } | null;
+  coachingItems: CoachingCardItem[];
 }
 
 function rampColor(v: number | null): string {
@@ -73,7 +69,7 @@ export default function DeveloperCoachingDashboard(props: DashboardProps) {
     momentum,
     streak,
     quests,
-    latestCoaching,
+    coachingItems,
   } = props;
 
   return (
@@ -226,8 +222,8 @@ export default function DeveloperCoachingDashboard(props: DashboardProps) {
         </section>
       )}
 
-      {/* Latest coaching */}
-      {latestCoaching && (
+      {/* Coaching suggestions */}
+      {coachingItems.length > 0 && (
         <section
           className="rounded-[14px] p-6"
           style={{
@@ -236,62 +232,11 @@ export default function DeveloperCoachingDashboard(props: DashboardProps) {
             boxShadow: 'var(--shadow)',
           }}
         >
-          <SectionHeader>
-            Latest coaching · PR #{latestCoaching.pr_number}{' '}
-            <span style={{ textTransform: 'none' }}>
-              "{latestCoaching.pr_title}"
-            </span>
-          </SectionHeader>
-
-          <div
-            className="rounded-[12px] p-5 mt-4"
-            style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2.5 min-w-0">
-                <span className="text-lg flex-shrink-0">🤖</span>
-                <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
-                  {latestCoaching.headline}
-                </p>
-              </div>
-              {latestCoaching.tag && (
-                <span
-                  className="text-[11px] font-medium flex-shrink-0 px-2 py-0.5 rounded-full"
-                  style={{ background: 'var(--sage-soft)', color: 'var(--sage-ink)' }}
-                >
-                  {latestCoaching.tag}
-                </span>
-              )}
-            </div>
-            <p className="text-[13px] mt-3" style={{ color: 'var(--ink-2)' }}>
-              {latestCoaching.body}
-            </p>
-
-            <div
-              className="flex flex-wrap items-center gap-2 mt-4 pt-4"
-              style={{ borderTop: '1px solid var(--line)' }}
-            >
-              {['📄 Text', '🔊 Voice', '🎬 Video walkthrough'].map((t) => (
-                <span
-                  key={t}
-                  className="text-[12px] px-2.5 py-1 rounded-full"
-                  style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--line)',
-                    color: 'var(--ink-2)',
-                  }}
-                >
-                  {t}
-                </span>
-              ))}
-              <span className="flex-1" />
-              <span className="text-[13px]" style={{ color: 'var(--ink-3)' }}>
-                👍 Helpful
-              </span>
-              <span className="text-[13px]" style={{ color: 'var(--ink-3)' }}>
-                👎
-              </span>
-            </div>
+          <SectionHeader>Coaching for you · recent PRs</SectionHeader>
+          <div className="space-y-4 mt-4">
+            {coachingItems.map((item, i) => (
+              <CoachingCard key={`${item.pr_number}-${i}`} item={item} />
+            ))}
           </div>
         </section>
       )}

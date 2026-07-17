@@ -59,13 +59,14 @@ interface ApiResponse {
     dimension: string | null;
     pr_number: number;
   }>;
-  latest_coaching: {
+  coaching_items: Array<{
     pr_number: number;
     pr_title: string;
     headline: string;
     tag: string | null;
     body: string;
-  } | null;
+    dimension: string | null;
+  }>;
   recent_prs: Array<{ merged_at: string }>;
   review_details: ReviewDetail[];
 }
@@ -162,7 +163,7 @@ export default function IndividualDeveloperPage() {
     momentum,
     streak,
     quests: apiData.quest_items,
-    latestCoaching: apiData.latest_coaching,
+    coachingItems: apiData.coaching_items,
   };
 
   return (

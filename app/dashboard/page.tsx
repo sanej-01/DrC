@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import DeveloperCoachingDashboard from '@/components/dashboard/DeveloperCoachingDashboard';
+import PRDetailsAccordion from '@/components/manager/PRDetailsAccordion';
+import { deriveCoachingItems } from '@/lib/coaching-derive';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -12,6 +14,8 @@ interface FeedbackItem {
   dimension?: string;
   title?: string;
   description?: string;
+  file_path?: string;
+  line_number?: number;
 }
 
 interface ScoreRow {
@@ -21,6 +25,28 @@ interface ScoreRow {
   test_coverage: number;
   overall_assessment?: string;
   feedback?: FeedbackItem[];
+}
+
+interface ReviewDetail {
+  pr_number: number;
+  pr_title: string;
+  merged_at: string;
+  overall_score: number;
+  dimensions: {
+    code_quality: number | null;
+    bug_risk: number | null;
+    architecture: number | null;
+    test_coverage: number | null;
+  };
+  overall_assessment: string | null;
+  feedback: Array<{
+    type: 'GOOD' | 'IMPROVE' | 'FIX' | 'SUGGEST';
+    dimension: string | null;
+    title: string | null;
+    description: string | null;
+    file_path: string | null;
+    line_number: number | null;
+  }>;
 }
 
 interface PrRow {
@@ -33,6 +59,7 @@ interface PrRow {
 
 export default function DashboardPage() {
   const [data, setData] = useState<React.ComponentProps<typeof DeveloperCoachingDashboard> | null>(null);
+  const [reviewDetails, setReviewDetails] = useState<ReviewDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,19 +174,39 @@ export default function DashboardPage() {
         )
         .slice(0, 3);
 
-      let latestCoaching = null;
-      const latest = scored[0];
-      if (latest) {
-        const fb = latest.score.feedback || [];
-        const lead = fb.find((f: FeedbackItem) => f.type !== 'GOOD') || fb[0];
-        latestCoaching = {
-          pr_number: latest.number,
-          pr_title: latest.title,
-          headline: lead?.title || latest.score.overall_assessment || 'Reviewed — nothing urgent flagged',
-          tag: lead?.dimension || null,
-          body: latest.score.overall_assessment || lead?.description || 'No detailed notes for this PR.',
-        };
-      }
+      const coachingItems = deriveCoachingItems(
+        scored.map((pr) => ({
+          pr_number: pr.number,
+          pr_title: pr.title,
+          overall_assessment: pr.score.overall_assessment,
+          feedback: pr.score.feedback || [],
+        }))
+      );
+
+      const overallOfScore = (s: ScoreRow) =>
+        Math.round((s.code_quality + (100 - s.bug_risk) + s.architecture + s.test_coverage) / 4);
+
+      const reviews: ReviewDetail[] = scored.slice(0, 20).map((pr) => ({
+        pr_number: pr.number,
+        pr_title: pr.title,
+        merged_at: pr.merged_at,
+        overall_score: overallOfScore(pr.score),
+        dimensions: {
+          code_quality: pr.score.code_quality,
+          bug_risk: pr.score.bug_risk,
+          architecture: pr.score.architecture,
+          test_coverage: pr.score.test_coverage,
+        },
+        overall_assessment: pr.score.overall_assessment || null,
+        feedback: (pr.score.feedback || []).map((f) => ({
+          type: f.type,
+          dimension: f.dimension || null,
+          title: f.title || null,
+          description: f.description || null,
+          file_path: f.file_path || null,
+          line_number: f.line_number ?? null,
+        })),
+      }));
 
       setData({
         firstName,
@@ -171,8 +218,9 @@ export default function DashboardPage() {
         momentum,
         streak,
         quests,
-        latestCoaching,
+        coachingItems,
       });
+      setReviewDetails(reviews);
       setLoading(false);
     } catch (err) {
       console.error('Error loading dashboard:', err);
@@ -193,5 +241,12 @@ export default function DashboardPage() {
     </div>
   );
 
-  return <DeveloperCoachingDashboard {...data} />;
+  return (
+    <>
+      <DeveloperCoachingDashboard {...data} />
+      <div className="mx-auto max-w-2xl px-6 pb-8">
+        <PRDetailsAccordion reviews={reviewDetails} />
+      </div>
+    </>
+  );
 }

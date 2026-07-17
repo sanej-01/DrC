@@ -34,6 +34,7 @@ interface PRDetail {
   additions_count: number;
   deletions_count: number;
   files_changed_count: number;
+  repo_name: string | null;
   score: PRScore | null;
 }
 
@@ -138,6 +139,9 @@ export function PRDetailsList({ workspaceId, refreshKey, onDataLoaded }: PRDetai
                 #{pr.number} {pr.title}
               </a>
               <p className="text-xs text-gray-500 mt-1">
+                {pr.repo_name && (
+                  <span className="font-medium text-gray-700">{pr.repo_name} · </span>
+                )}
                 {pr.author_display_name || pr.author_github_handle} · merged{' '}
                 {new Date(pr.merged_at).toLocaleDateString()} · {pr.files_changed_count} files
                 {' '}(<span className="text-green-600">+{pr.additions_count}</span>{' '}
